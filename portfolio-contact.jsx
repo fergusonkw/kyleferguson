@@ -1,12 +1,19 @@
 /* ============================================================
-   Contact — inquiry form with validation
+   Contact — inquiry form with validation + PHPMailer submission
    ============================================================ */
 
 function Contact() {
-  const [form, setForm] = useState({ name: '', email: '', company: '', type: '', message: '' });
-  const [touched, setTouched] = useState({});
+  const [form, setForm]           = useState({ name: '', email: '', company: '', type: '', message: '' });
+  const [copyToSelf, setCopyToSelf] = useState(false);
+  const [touched, setTouched]     = useState({});
   const [submitted, setSubmitted] = useState(false);
-  const [sent, setSent] = useState(false);
+  const [sending, setSending]     = useState(false);
+  const [sent, setSent]           = useState(false);
+  const [ticket, setTicket]       = useState('');
+  const [serverError, setServerError] = useState('');
+
+  // Spam: timestamp captured when component mounts
+  const loadedAt = React.useRef(Math.floor(Date.now() / 1000));
 
   const types = ['Custom CMS', 'SaaS product', 'API / integration', 'Website', 'Not sure yet'];
 
@@ -16,15 +23,43 @@ function Contact() {
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errors.email = 'Enter a valid email';
   if (!form.message.trim()) errors.message = 'Tell me a little about it';
 
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
-  const blur = (k) => () => setTouched((t) => ({ ...t, [k]: true }));
+  const set   = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const blur  = (k) => () => setTouched((t) => ({ ...t, [k]: true }));
   const showErr = (k) => (touched[k] || submitted) && errors[k];
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     setSubmitted(true);
-    if (Object.keys(errors).length === 0) {
-      setSent(true);
+    setServerError('');
+    if (Object.keys(errors).length > 0) return;
+
+    setSending(true);
+    try {
+      const res = await fetch('contact.php', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name:       form.name,
+          email:      form.email,
+          company:    form.company,
+          type:       form.type,
+          message:    form.message,
+          copyToSelf,
+          _t:  loadedAt.current,  // time trap
+          _hp: '',                 // honeypot — always blank; bots fill it
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setTicket(data.ticket || '');
+        setSent(true);
+      } else {
+        setServerError(data.error || 'Something went wrong. Please try again.');
+      }
+    } catch {
+      setServerError('Could not reach the server. Please email hello@kyleferguson.ca directly.');
+    } finally {
+      setSending(false);
     }
   };
 
@@ -47,6 +82,7 @@ function Contact() {
       <div className="shell">
         <SectionHeader no="§ 04" title="Contact" meta="START A PROJECT" />
         <div style={{ display: 'grid', gridTemplateColumns: '0.85fr 1.15fr', gap: 64 }} className="contact-grid">
+
           {/* left intro */}
           <div className="reveal">
             <h2 style={{
@@ -80,12 +116,23 @@ function Contact() {
                   Thanks, {form.name.split(' ')[0] || 'there'}. I've logged your inquiry and will
                   be in touch at <strong style={{ color: 'var(--c-ink)' }}>{form.email}</strong> shortly.
                 </p>
+                {copyToSelf && (
+                  <p style={{ color: 'var(--c-mute)', fontSize: 14, marginTop: 10 }}>
+                    A copy of your message is on its way to your inbox.
+                  </p>
+                )}
                 <p className="tlabel" style={{ marginTop: 28, color: 'var(--c-faint)' }}>
-                  TICKET #KF-{Math.floor(1000 + Math.random() * 9000)} · LOGGED
+                  {ticket ? `TICKET #${ticket} · LOGGED` : 'LOGGED'}
                 </p>
               </div>
             ) : (
               <form onSubmit={submit} noValidate>
+                {/* Honeypot — hidden from real users, bots fill it */}
+                <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', top: '-9999px', width: 1, height: 1, overflow: 'hidden' }}>
+                  <label htmlFor="_hp">Leave this field empty</label>
+                  <input id="_hp" name="_hp" type="text" tabIndex={-1} autoComplete="off" />
+                </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginBottom: 18 }}>
                   <div>
                     <Label id="name">Name</Label>
@@ -116,14 +163,50 @@ function Contact() {
                     ))}
                   </div>
                 </div>
-                <div style={{ marginBottom: 24 }}>
+                <div style={{ marginBottom: 18 }}>
                   <Label id="message">Project details</Label>
                   <textarea id="message" rows={4} style={{ ...fieldStyle('message'), resize: 'vertical', lineHeight: 1.55 }}
                     value={form.message} onChange={set('message')} onBlur={blur('message')}
                     placeholder="What are you running, and where is it getting stuck?" />
                 </div>
-                <button type="submit" className="btn btn--solid" style={{ width: '100%', justifyContent: 'center', padding: '16px' }}>
-                  Send inquiry <span className="arrow">→</span>
+
+                {/* Copy to self */}
+                <div style={{ marginBottom: 22 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', userSelect: 'none' }}>
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      width: 18, height: 18, flexShrink: 0,
+                      border: '1px solid ' + (copyToSelf ? 'var(--c-accent)' : 'var(--c-line-2)'),
+                      background: copyToSelf ? 'var(--c-accent)' : 'transparent',
+                      transition: 'all .15s ease',
+                    }}>
+                      {copyToSelf && <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={copyToSelf}
+                      onChange={(e) => setCopyToSelf(e.target.checked)}
+                      style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
+                    />
+                    <span className="tlabel" style={{ color: 'var(--c-ink-2)', letterSpacing: '0.06em' }}>
+                      Send me a copy of this message
+                    </span>
+                  </label>
+                </div>
+
+                {serverError && (
+                  <p style={{ color: 'var(--c-accent)', fontSize: 13, marginBottom: 14, lineHeight: 1.5 }}>
+                    {serverError}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={sending}
+                  className="btn btn--solid"
+                  style={{ width: '100%', justifyContent: 'center', padding: '16px', opacity: sending ? 0.6 : 1, transition: 'opacity .2s' }}
+                >
+                  {sending ? 'Sending…' : <>Send inquiry <span className="arrow">→</span></>}
                 </button>
               </form>
             )}
