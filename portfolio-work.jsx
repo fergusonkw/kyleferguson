@@ -9,13 +9,16 @@ const PROJECTS = [
     summary: 'A multi-tenant SaaS for managing tractor-pull events and organizations — classes, entries, results, and points standings — with native iOS & Android companion apps for live results and a documented public REST API consumed by member-association sites.',
     stack: ['Laravel 13', 'PHP 8.4', 'MySQL', 'React + Capacitor', 'REST API'],
     scope: ['SaaS', 'Native apps', 'Public API'],
+    image: 'assets/work/tracker-pull.png',
+    imageMobile: 'assets/work/tracker-pull-mobile.png',
   },
   {
     no: '02', name: 'Crapaud Exhibition', type: 'Public Site + Admin', year: 'Since 2009',
-    client: 'Annual agricultural fair, PEI', role: 'Design + Build',
+    client: 'Crapaud Exhibition Association', role: 'Design + Build',
     summary: 'The public site for an annual PEI agricultural fair — schedule, competition rules across a dozen categories, entry forms, and a DB-backed photo gallery moderated through a staff admin dashboard. In production since 2009 and refined every season since.',
     stack: ['PHP 8', 'MySQL', 'PHPMailer'],
     scope: ['Public site', 'Admin', 'Forms'],
+    image: 'assets/work/crapaud-exhibition.png',
   },
   {
     no: '03', name: 'A & M Snow', type: 'Operations Platform', year: '2026',
@@ -30,26 +33,37 @@ const PROJECTS = [
     summary: 'The public-facing site for the Maritime Truck & Tractor Pull Association — schedules, results, season standings, competitor profiles, and photo galleries — all consumed live from the Tracker Pull API through a cached service layer. No local business data; every page reflects the platform in real time.',
     stack: ['Laravel 12', 'Tailwind 4', 'Vite', 'Tracker Pull API'],
     scope: ['Public site', 'API consumer', 'Cached'],
+    image: 'assets/work/mttpa.png',
   },
   {
     no: '05', name: 'PEI Truck & Tractor Pulls', type: 'Public Site (API consumer)', year: 'Since 2009',
-    client: 'PEI Truck & Tractor Pull club', role: 'Design + Build',
+    client: 'PEI Truck & Tractor Pull Association', role: 'Design + Build',
     summary: 'The club site for PEI Truck & Tractor Pulls — schedule, results, rules, galleries, and policies — driven by a lean PHP front-end that consumes the Tracker Pull API for live event data. In production since 2009; ported onto the Tracker Pull platform as it came online.',
     stack: ['PHP', 'Tracker Pull API', 'JS'],
     scope: ['Public site', 'API consumer'],
+    image: 'assets/work/pei-truck-tractor.png',
   },
 ];
 
-/* striped media placeholder with monospace explainer */
-function Media({ label, ratio = '16 / 10' }) {
+/* media frame — renders a real screenshot when `src` is provided,
+   falls back to the striped blueprint placeholder otherwise. */
+function Media({ label, ratio = '16 / 10', src, alt }) {
+  const baseStyle = {
+    position: 'relative', aspectRatio: ratio, width: '100%',
+    border: '1px solid var(--c-line)', overflow: 'hidden',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  };
+  if (src) {
+    return (
+      <div className="media-frame" style={{ ...baseStyle, background: 'var(--c-surface)' }}>
+        <img src={src} alt={alt || label} loading="lazy"
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+      </div>
+    );
+  }
   return (
-    <div style={{
-      position: 'relative', aspectRatio: ratio, width: '100%',
-      background:
-        'repeating-linear-gradient(135deg, var(--c-surface) 0, var(--c-surface) 9px, var(--c-surface-2) 9px, var(--c-surface-2) 18px)',
-      border: '1px solid var(--c-line)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-    }}>
+    <div style={{ ...baseStyle, background:
+      'repeating-linear-gradient(135deg, var(--c-surface) 0, var(--c-surface) 9px, var(--c-surface-2) 9px, var(--c-surface-2) 18px)' }}>
       <span className="tlabel" style={{
         background: 'var(--c-bg)', padding: '5px 11px', border: '1px solid var(--c-line-2)',
         color: 'var(--c-mute)', letterSpacing: '0.12em',
@@ -114,7 +128,7 @@ function WorkIndex() {
                     </div>
                     <StackTags items={p.stack} accentFirst />
                   </div>
-                  <Media label={'[ ' + p.name.toUpperCase() + ' — SCREEN ]'} ratio="16 / 10" />
+                  <Media label={'[ ' + p.name.toUpperCase() + ' — SCREEN ]'} ratio="16 / 10" src={p.image} alt={p.name + ' — screenshot'} />
                 </div>
               </div>
             </div>
@@ -144,7 +158,7 @@ function WorkCards() {
           padding: 22, transition: 'border-color .25s ease, transform .25s ease',
         }}>
           <CornerTicks />
-          <Media label={'[ ' + p.name.toUpperCase() + ' ]'} ratio="16 / 9" />
+          <Media label={'[ ' + p.name.toUpperCase() + ' ]'} ratio="16 / 9" src={p.image} alt={p.name + ' — screenshot'} />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 22, marginBottom: 4 }}>
             <span className="tlabel tlabel--accent">{p.no} / {p.type}</span>
             <span className="tlabel" style={{ color: 'var(--c-faint)' }}>{p.year}</span>
@@ -187,7 +201,7 @@ function WorkStacked() {
             <StackTags items={p.stack} accentFirst />
           </div>
           <div style={{ order: 1, position: 'relative' }}>
-            <Media label={'[ ' + p.name.toUpperCase() + ' — SCREEN ]'} ratio="4 / 3" />
+            <Media label={'[ ' + p.name.toUpperCase() + ' — SCREEN ]'} ratio="4 / 3" src={p.image} alt={p.name + ' — screenshot'} />
           </div>
         </article>
       ))}

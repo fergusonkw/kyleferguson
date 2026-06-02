@@ -5,7 +5,9 @@
       "Read(//tmp/design/kyle-ferguson-designs/**)",
       "Read(//c/laragon/www/amsnow/docs/planning//**)",
       "Read(//c/laragon/www/PEITruckAndTractorPull//**)",
-      "Read(//c/laragon/www/tracker_pull_mobile_app/**)"
+      "Read(//c/laragon/www/tracker_pull_mobile_app/**)",
+      "mcp__Claude_in_Chrome__list_connected_browsers",
+      "Bash(ls -la /c/Users/fergu/.claude/projects/C--laragon-www-kyleferguson/4e3a8919-f93f-4c08-8bb2-588a3af3a287/ 2>/dev/null | head -30 && echo \"---\" && ls /c/Users/fergu/.claude/projects/C--laragon-www-kyleferguson/4e3a8919-f93f-4c08-8bb2-588a3af3a287/tool-results/ 2>/dev/null | tail -10)"
     ]
   }
 }

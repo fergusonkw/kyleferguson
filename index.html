@@ -35,6 +35,19 @@
   .svc-cell { transition: background .2s ease; }
   .svc-cell:hover { background: var(--c-surface) !important; }
 
+  /* screenshot treatment — quiet by default, activate on attention */
+  .media-frame img {
+    filter: grayscale(0.85) brightness(0.85) contrast(1.05);
+    transition: filter .35s ease;
+  }
+  .work-card:hover .media-frame img,
+  .stacked-row:hover .media-frame img,
+  .ledger-row:hover + div .media-frame img,
+  .ledger-detail:hover .media-frame img { filter: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .media-frame img { transition: none; }
+  }
+
   /* ---------- responsive ---------- */
   @media (max-width: 1024px) {
     :root { --page-pad: 28px; }
