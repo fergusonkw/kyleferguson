@@ -2,3 +2,4 @@ vendor/
 mail-config.php
 *.log
 .idea/
+mail-config.php

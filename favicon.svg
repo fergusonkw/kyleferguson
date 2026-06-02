@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges">
+  <!-- charcoal field -->
+  <rect width="32" height="32" fill="#15161a"/>
+  <!-- hairline frame in line-2 charcoal -->
+  <rect x="0.5" y="0.5" width="31" height="31" fill="none" stroke="#383c46" stroke-width="1"/>
+  <!-- red corner tick (top-left), echoing the Monogram accent -->
+  <path d="M0 0 H9 V2 H2 V9 H0 Z" fill="#c0392b"/>
+  <!-- KF lettermark — geometric, weight-balanced for small sizes -->
+  <g fill="#e9e9ec">
+    <!-- K: vertical stem + two diagonals meeting at the midline -->
+    <rect x="8" y="9" width="2.5" height="14"/>
+    <path d="M10.5 16 L15.5 9 H18 L13 16 L18 23 H15.5 Z"/>
+    <!-- F: vertical stem + top bar + mid bar -->
+    <rect x="20" y="9" width="2.5" height="14"/>
+    <rect x="22.5" y="9" width="5" height="2.25"/>
+    <rect x="22.5" y="14.5" width="4" height="2.25"/>
+  </g>
+</svg>

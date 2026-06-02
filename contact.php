@@ -152,7 +152,7 @@ function adminEmailHtml(
     $eCompany = htmlspecialchars($company, ENT_QUOTES, 'UTF-8') ?: '<span style="color:#4b4e57">—</span>';
     $eType    = htmlspecialchars($type,    ENT_QUOTES, 'UTF-8') ?: '<span style="color:#4b4e57">—</span>';
     $eMsg     = nl2br(htmlspecialchars($message, ENT_QUOTES, 'UTF-8'));
-    $copyNote = $copyToSelf ? 'Yes — sender CC'd' : 'No';
+    $copyNote = $copyToSelf ? 'Yes — sender CC\'d' : 'No';
 
     return <<<HTML
 <!DOCTYPE html>
