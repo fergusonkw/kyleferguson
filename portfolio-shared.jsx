@@ -150,17 +150,10 @@ function Footer() {
               that run real-world operations.
             </p>
           </div>
-          <div style={{ display: 'flex', gap: 56, flexWrap: 'wrap' }}>
-            <div>
-              <div className="tlabel" style={{ marginBottom: 12 }}>Direct</div>
-              <a href="#contact" className="footer-link">hello@kyleferguson.ca</a>
-              <a href="#contact" className="footer-link">Start a project →</a>
-            </div>
-            <div>
-              <div className="tlabel" style={{ marginBottom: 12 }}>Elsewhere</div>
-              <a href="#" className="footer-link">GitHub</a>
-              <a href="#" className="footer-link">LinkedIn</a>
-            </div>
+          <div>
+            <div className="tlabel" style={{ marginBottom: 12 }}>Direct</div>
+            <a href="mailto:hello@kyleferguson.ca" className="footer-link">hello@kyleferguson.ca</a>
+            <a href="#contact" className="footer-link">Start a project →</a>
           </div>
         </div>
         <div style={{

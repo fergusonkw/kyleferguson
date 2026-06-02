@@ -72,7 +72,7 @@ function TitleBlock() {
   const rows = [
     ['ROLE', 'Full-stack developer'],
     ['FOCUS', 'CMS · SaaS · APIs'],
-    ['EXP', '15+ years shipping'],
+    ['EXP', '17+ years shipping'],
     ['BASED', 'PEI, Canada'],
     ['STATUS', 'Booking 2026'],
   ];
@@ -129,10 +129,10 @@ function Services() {
 /* ---------- TECH / CAPABILITIES ---------- */
 function Stack() {
   const groups = [
-    ['Backend', ['Node.js', 'PHP / Laravel', 'MySQL', 'REST APIs', 'Auth & RBAC']],
-    ['Frontend', ['JavaScript', 'React', 'TypeScript', 'HTML / CSS', 'Design systems']],
-    ['Mobile', ['Native iOS', 'Native Android', 'Offline-first', 'Push & sync']],
-    ['Infrastructure', ['Linux / VPS', 'CI / CD', 'Backups', 'Monitoring', 'CDN']],
+    ['Backend', ['PHP / Laravel', 'MySQL', 'REST APIs', 'Auth & RBAC', 'PHPUnit']],
+    ['Frontend', ['Blade', 'Tailwind CSS', 'Vite', 'Alpine.js', 'Design systems']],
+    ['Mobile', ['React + Capacitor', 'Native iOS', 'Native Android', 'Offline-first', 'IndexedDB cache']],
+    ['Infrastructure', ['Laravel Forge', 'DigitalOcean', 'Cloudflare', 'Redis', 'Sentry', 'Off-site backups']],
   ];
   return (
     <section id="stack" className="section">

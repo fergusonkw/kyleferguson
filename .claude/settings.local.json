@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "WebFetch(domain:api.anthropic.com)",
-      "Read(//tmp/design/kyle-ferguson-designs/**)"
+      "Read(//tmp/design/kyle-ferguson-designs/**)",
+      "Read(//c/laragon/www/amsnow/docs/planning//**)",
+      "Read(//c/laragon/www/PEITruckAndTractorPull//**)",
+      "Read(//c/laragon/www/tracker_pull_mobile_app/**)"
     ]
   }
 }

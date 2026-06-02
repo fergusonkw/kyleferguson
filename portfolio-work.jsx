@@ -4,32 +4,39 @@
 
 const PROJECTS = [
   {
-    no: '01', name: 'Tracker Pull', type: 'SaaS + Native Apps', year: '2024',
+    no: '01', name: 'Tracker Pull', type: 'SaaS + Native Apps', year: '2025',
     client: 'Tractor-pull events & organizations', role: 'Architecture · Full-stack · Mobile',
-    summary: 'A multi-tenant SaaS for managing tractor-pull events and organizations — classes, entries, live scoring, and standings — with native iOS & Android companion apps and a documented public API.',
-    stack: ['Laravel', 'iOS', 'Android', 'REST API', 'React', 'MySQL'],
+    summary: 'A multi-tenant SaaS for managing tractor-pull events and organizations — classes, entries, results, and points standings — with native iOS & Android companion apps for live results and a documented public REST API consumed by member-association sites.',
+    stack: ['Laravel 13', 'PHP 8.4', 'MySQL', 'React + Capacitor', 'REST API'],
     scope: ['SaaS', 'Native apps', 'Public API'],
   },
   {
-    no: '02', name: 'Crapaud Exhibition', type: 'Marketing Site', year: '2022',
-    client: 'Regional exhibition & fair', role: 'Design + Build',
-    summary: 'A fast, durable static marketing site for a regional exhibition — schedule, attractions, and visitor information — built to absorb seasonal traffic spikes without breaking a sweat.',
-    stack: ['Static', 'HTML/CSS', 'JS'],
-    scope: ['Static', 'Marketing'],
+    no: '02', name: 'Crapaud Exhibition', type: 'Public Site + Admin', year: 'Since 2009',
+    client: 'Annual agricultural fair, PEI', role: 'Design + Build',
+    summary: 'The public site for an annual PEI agricultural fair — schedule, competition rules across a dozen categories, entry forms, and a DB-backed photo gallery moderated through a staff admin dashboard. In production since 2009 and refined every season since.',
+    stack: ['PHP 8', 'MySQL', 'PHPMailer'],
+    scope: ['Public site', 'Admin', 'Forms'],
   },
   {
-    no: '03', name: 'A & M Snow', type: 'Operations CMS', year: '2023',
+    no: '03', name: 'A & M Snow', type: 'Operations Platform', year: '2026',
     client: 'Regional snow-removal company', role: 'Design + Full-stack',
-    summary: 'A custom CMS that runs a snow-removal business end to end — customer accounts, site routes, dispatch scheduling, service logging, and seasonal billing in one operational hub.',
-    stack: ['Laravel', 'MySQL', 'Android', 'REST API'],
-    scope: ['Dispatch', 'Routing', 'Billing'],
+    summary: 'A phased modernization of a decade-old snow-removal management system. Rebuilt on Laravel with per-invoice balance tracking, safe void-and-reissue corrections, automatic CC surcharging, and owed-vs-collected reporting. Driver route PWA, online card payments, bulk SMS/email, and JD Link GPS auto-completion sequenced in as follow-on phases.',
+    stack: ['Laravel 13', 'MySQL', 'Tailwind v4', 'PWA'],
+    scope: ['Billing', 'Dispatch', 'Driver app', 'GPS'],
   },
   {
-    no: '04', name: 'PEI Truck & Tractor Pulls', type: 'Data-driven Page', year: '2024',
-    client: 'Local tractor-pull event', role: 'Frontend',
-    summary: 'A public results page for a local tractor pull that consumes the Tracker Pull API — live standings and class results, updating in step with the event as it runs.',
-    stack: ['Laravel', 'API client', 'JS'],
-    scope: ['API consumer', 'Live data'],
+    no: '04', name: 'MTTPA Website', type: 'Public Site (API consumer)', year: 'Since 2016',
+    client: 'Maritime Truck & Tractor Pull Association', role: 'Design + Build',
+    summary: 'The public-facing site for the Maritime Truck & Tractor Pull Association — schedules, results, season standings, competitor profiles, and photo galleries — all consumed live from the Tracker Pull API through a cached service layer. No local business data; every page reflects the platform in real time.',
+    stack: ['Laravel 12', 'Tailwind 4', 'Vite', 'Tracker Pull API'],
+    scope: ['Public site', 'API consumer', 'Cached'],
+  },
+  {
+    no: '05', name: 'PEI Truck & Tractor Pulls', type: 'Public Site (API consumer)', year: 'Since 2009',
+    client: 'PEI Truck & Tractor Pull club', role: 'Design + Build',
+    summary: 'The club site for PEI Truck & Tractor Pulls — schedule, results, rules, galleries, and policies — driven by a lean PHP front-end that consumes the Tracker Pull API for live event data. In production since 2009; ported onto the Tracker Pull platform as it came online.',
+    stack: ['PHP', 'Tracker Pull API', 'JS'],
+    scope: ['Public site', 'API consumer'],
   },
 ];
 
@@ -193,7 +200,7 @@ function Work({ layout }) {
     <section id="work" className="section">
       <span className="tick" style={{ top: -5, right: -5 }} />
       <div className="shell">
-        <SectionHeader no="§ 01" title="Selected Work" meta={'04 PROJECTS / ' + layout.toUpperCase()} />
+        <SectionHeader no="§ 01" title="Selected Work" meta={'05 PROJECTS / ' + layout.toUpperCase()} />
         {layout === 'index' && <WorkIndex />}
         {layout === 'cards' && <WorkCards />}
         {layout === 'stacked' && <WorkStacked />}
