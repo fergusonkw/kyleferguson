@@ -81,6 +81,12 @@
             <x-admin-v2.form.textarea name="late_fee_terms" label="Late Fee Terms (rendered on invoice footer)" rows="2"
                 placeholder="A 2% monthly interest charge applies to balances unpaid after 30 days." />
 
+            <hr class="border-default-200 my-4">
+            <p class="text-xs font-semibold uppercase text-default-400 tracking-wider mb-3">Cost Thresholds</p>
+            <x-admin-v2.form.input name="trailing_12mo_threshold_usd" type="number" step="0.01" min="0"
+                label="Trailing 12-Month Cost Threshold (USD, optional)"
+                placeholder="e.g. 50000 — warn when attributed costs exceed this" />
+
             <div class="border-t border-default-200 flex gap-2 justify-end pt-4 mt-4">
                 <button type="button" class="btn btn-light" data-hs-overlay="#businessOffcanvas">Cancel</button>
                 <button type="submit" class="btn btn-primary" id="saveBusinessBtn">
@@ -109,7 +115,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('businessId').value = b.id;
         for (const k of ['name','legal_name','address','contact_email','notification_email','brand_primary_color',
             'brand_secondary_color','invoice_number_prefix','default_currency','fx_source','tax_registered_from',
-            'daily_reminder_time','late_fee_terms']) {
+            'daily_reminder_time','late_fee_terms','trailing_12mo_threshold_usd']) {
             const el = document.querySelector(`[name="${k}"]`);
             if (el) el.value = b[k] ?? '';
         }

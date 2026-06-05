@@ -145,13 +145,52 @@ final class InvoiceBuilder
                 ]);
             }
 
-            $subtotal = (float) $invoice->lines()->whereNotIn('line_type', [
-                InvoiceLineType::Tax->value,
-                InvoiceLineType::Discount->value,
-                InvoiceLineType::Credit->value,
+            // Carry forward unclaimed overpayments from prior paid invoices as credits.
+            $paidInvoices = Invoice::query()
+                ->where('client_id', $client->id)
+                ->where('status', InvoiceStatus::Paid)
+                ->get();
+
+            foreach ($paidInvoices as $priorInvoice) {
+                $overpayment = round($priorInvoice->totalPaid() - $priorInvoice->total, 2);
+
+                if ($overpayment <= 0) {
+                    continue;
+                }
+
+                $sourceRef = 'overpayment:invoice:'.$priorInvoice->id;
+
+                $alreadyCredited = InvoiceLine::query()
+                    ->where('source_reference', $sourceRef)
+                    ->exists();
+
+                if ($alreadyCredited) {
+                    continue;
+                }
+
+                InvoiceLine::create([
+                    'invoice_id' => $invoice->id,
+                    'label' => 'Overpayment Credit — Invoice #'.$priorInvoice->invoice_number,
+                    'line_type' => InvoiceLineType::Credit,
+                    'amount' => $overpayment,
+                    'source_reference' => $sourceRef,
+                    'display_order' => $displayOrder++,
+                ]);
+            }
+
+            // Compute subtotal (hosting + recurring + adjustments; excludes tax/discount/credit).
+            $lines = $invoice->fresh()->lines()->get();
+
+            $subtotal = (float) $lines->whereNotIn('line_type', [
+                InvoiceLineType::Tax,
+                InvoiceLineType::Discount,
+                InvoiceLineType::Credit,
             ])->sum('amount');
 
-            $total = $subtotal;
+            $creditTotal = (float) $lines->whereIn('line_type', [
+                InvoiceLineType::Discount,
+                InvoiceLineType::Credit,
+            ])->sum('amount');
 
             if ($business->isTaxRegisteredOn($periodStart)) {
                 $taxAmount = round($subtotal * self::TAX_RATE, 2);
@@ -164,7 +203,9 @@ final class InvoiceBuilder
                     'display_order' => $displayOrder++,
                 ]);
 
-                $total = round($subtotal + $taxAmount, 2);
+                $total = round($subtotal + $taxAmount - $creditTotal, 2);
+            } else {
+                $total = round($subtotal - $creditTotal, 2);
             }
 
             $invoice->update(['subtotal' => $subtotal, 'total' => $total]);

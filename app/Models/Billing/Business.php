@@ -29,6 +29,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $notification_email
  * @property string $daily_reminder_time
  * @property string|null $late_fee_terms
+ * @property float|null $trailing_12mo_threshold_usd
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Client> $clients
@@ -64,6 +65,7 @@ final class Business extends Model
         'notification_email',
         'daily_reminder_time',
         'late_fee_terms',
+        'trailing_12mo_threshold_usd',
     ];
 
     /** @return HasMany<Client, $this> */
@@ -105,6 +107,7 @@ final class Business extends Model
             'supported_currencies' => 'array',
             'tax_registered_from' => 'date',
             'invoice_number_sequence' => 'integer',
+            'trailing_12mo_threshold_usd' => 'float',
         ];
     }
 }

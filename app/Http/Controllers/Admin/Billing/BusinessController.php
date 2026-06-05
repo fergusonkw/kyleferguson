@@ -103,6 +103,7 @@ final class BusinessController extends Controller
                 'tax_registered_from' => $business->tax_registered_from?->format('Y-m-d'),
                 'daily_reminder_time' => substr((string) $business->daily_reminder_time, 0, 5),
                 'late_fee_terms' => $business->late_fee_terms,
+                'trailing_12mo_threshold_usd' => $business->trailing_12mo_threshold_usd,
             ],
         ]);
     }

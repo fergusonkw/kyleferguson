@@ -64,6 +64,26 @@ final class ReconciliationReporter
     }
 
     /**
+     * Returns trailing-12mo cost versus the business's configured threshold.
+     *
+     * @return array{exceeded: bool, total_usd: float, threshold_usd: float|null, percentage: float|null}
+     */
+    public function trailingThresholdStatus(Business $business): array
+    {
+        $trailing = $this->trailing12MonthCosts($business);
+        $threshold = $business->trailing_12mo_threshold_usd;
+
+        return [
+            'exceeded' => $threshold !== null && $trailing['total_usd'] > $threshold,
+            'total_usd' => $trailing['total_usd'],
+            'threshold_usd' => $threshold,
+            'percentage' => ($threshold !== null && $threshold > 0)
+                ? round($trailing['total_usd'] / $threshold * 100, 1)
+                : null,
+        ];
+    }
+
+    /**
      * @return list<string>
      */
     private function trailing12Periods(): array

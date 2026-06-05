@@ -114,13 +114,31 @@
 
         {{-- Trailing 12-month costs --}}
         <x-admin-v2.card title="Trailing 12-Month Attributed Costs (USD)">
-            <div class="flex items-end gap-1">
+            @if($data['threshold_status']['exceeded'])
+                <x-admin-v2.alert type="danger" message="Cost threshold exceeded: ${{ number_format($data['threshold_status']['total_usd'], 2) }} of ${{ number_format($data['threshold_status']['threshold_usd'], 2) }} threshold ({{ $data['threshold_status']['percentage'] }}%)." />
+            @endif
+
+            <div class="flex items-end gap-1 mt-2">
                 <span class="text-3xl font-bold">${{ number_format($data['trailing']['total_usd'], 2) }}</span>
                 <span class="text-sm text-default-400 mb-1">across {{ count($data['trailing']['periods']) }} periods</span>
             </div>
             <p class="text-xs text-default-400 mt-1">
                 Periods: {{ implode(', ', $data['trailing']['periods']) }}
             </p>
+
+            @if($data['threshold_status']['threshold_usd'] !== null)
+                <div class="mt-4">
+                    <div class="flex justify-between text-xs text-default-500 mb-1">
+                        <span>vs threshold of ${{ number_format($data['threshold_status']['threshold_usd'], 2) }}</span>
+                        <span>{{ $data['threshold_status']['percentage'] }}%</span>
+                    </div>
+                    <div class="w-full bg-default-200 rounded-full h-2">
+                        @php $pct = min((float)($data['threshold_status']['percentage'] ?? 0), 100); @endphp
+                        <div class="h-2 rounded-full {{ $data['threshold_status']['exceeded'] ? 'bg-danger' : ($pct >= 80 ? 'bg-warning' : 'bg-success') }}"
+                             style="width: {{ $pct }}%"></div>
+                    </div>
+                </div>
+            @endif
         </x-admin-v2.card>
     @endif
 @endsection

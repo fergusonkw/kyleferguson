@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Jobs\Billing\DetectBillingRestatementsJob;
 use App\Jobs\Billing\DraftReminderDigestJob;
 use App\Jobs\Billing\FetchFxRateJob;
 use App\Jobs\Billing\GenerateMonthlyDraftsJob;
@@ -47,6 +48,18 @@ Schedule::call(function (): void {
             SyncDigitalOceanBillingJob::dispatch($provider->id, $period);
         });
 })->daily()->at('03:00')->name('billing:sync-do-billing')->withoutOverlapping();
+
+// Daily billing restatement detection — runs after billing sync to diff payloads.
+Schedule::call(function (): void {
+    $period = now()->format('Y-m');
+
+    CostProvider::query()
+        ->where('enabled', true)
+        ->where('slug', 'digitalocean')
+        ->each(function (CostProvider $provider) use ($period): void {
+            DetectBillingRestatementsJob::dispatch($provider->id, $period);
+        });
+})->daily()->at('03:30')->name('billing:detect-restatements')->withoutOverlapping();
 
 // Monthly FX rate fetch for all currency pairs used across businesses.
 // Runs on the 1st of each month so rates are available before draft generation.

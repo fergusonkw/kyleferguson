@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\Billing\InvoiceLineController;
 use App\Http\Controllers\Admin\Billing\PaymentController;
 use App\Http\Controllers\Admin\Billing\ProjectController as BillingProjectController;
 use App\Http\Controllers\Admin\Billing\ReconciliationController;
+use App\Http\Controllers\Admin\Billing\RecurringLineTemplateController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\LogViewerController;
 use App\Http\Controllers\Admin\MaintenanceController;
@@ -162,6 +163,14 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'email.verified', '2
 
         // Reconciliation
         Route::get('reconciliation', [ReconciliationController::class, 'index'])->name('reconciliation.index');
+
+        // Recurring line templates
+        Route::get('recurring-line-templates', [RecurringLineTemplateController::class, 'index'])->name('recurring-line-templates.index');
+        Route::get('recurring-line-templates/data', [RecurringLineTemplateController::class, 'data'])->name('recurring-line-templates.data');
+        Route::post('recurring-line-templates', [RecurringLineTemplateController::class, 'store'])->name('recurring-line-templates.store');
+        Route::get('recurring-line-templates/{recurringLineTemplate}/edit', [RecurringLineTemplateController::class, 'edit'])->name('recurring-line-templates.edit');
+        Route::put('recurring-line-templates/{recurringLineTemplate}', [RecurringLineTemplateController::class, 'update'])->name('recurring-line-templates.update');
+        Route::delete('recurring-line-templates/{recurringLineTemplate}', [RecurringLineTemplateController::class, 'destroy'])->name('recurring-line-templates.destroy');
 
         // Invoices
         Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices.index');

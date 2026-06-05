@@ -31,6 +31,7 @@ final class ReconciliationController extends Controller
         if ($currentBusiness !== null) {
             $costGap = $this->reporter->costGap($currentBusiness, $period);
             $trailing = $this->reporter->trailing12MonthCosts($currentBusiness);
+            $thresholdStatus = $this->reporter->trailingThresholdStatus($currentBusiness);
 
             $unattributedResources = ProviderResource::query()
                 ->with(['costProvider', 'currentAssignment'])
@@ -50,6 +51,7 @@ final class ReconciliationController extends Controller
             $data = [
                 'cost_gap' => $costGap,
                 'trailing' => $trailing,
+                'threshold_status' => $thresholdStatus,
                 'unattributed_resources' => $unattributedResources,
                 'unattributed_line_items' => $unattributedLineItems,
                 'period' => $period,

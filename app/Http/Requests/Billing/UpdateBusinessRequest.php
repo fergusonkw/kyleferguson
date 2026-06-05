@@ -37,6 +37,7 @@ final class UpdateBusinessRequest extends FormRequest
             'tax_registered_from' => ['nullable', 'date'],
             'daily_reminder_time' => ['required', 'date_format:H:i'],
             'late_fee_terms' => ['nullable', 'string', 'max:2000'],
+            'trailing_12mo_threshold_usd' => ['nullable', 'numeric', 'min:0'],
         ];
     }
 }
