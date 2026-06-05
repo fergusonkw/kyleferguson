@@ -1,5 +1,81 @@
-vendor/
-mail-config.php
 *.log
-.idea/
-mail-config.php
+.DS_Store
+.env
+.env.backup
+.env.production
+.phpactor.json
+.phpunit.result.cache
+/.fleet
+/.idea
+/.nova
+/.phpunit.cache
+/.vscode
+/.zed
+/auth.json
+/node_modules
+/public/build
+/public/hot
+/public/storage
+/public/events
+/public/registrations
+/storage/*.key
+/storage/pail
+/storage/phpstan
+/vendor
+Homestead.json
+Homestead.yaml
+Thumbs.db
+
+# Development SQLite databases
+/database/*.sqlite
+/database/*.sqlite-shm
+/database/*.sqlite-wal
+
+# NPM/Yarn debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Coverage reports
+/coverage/
+htmlcov/
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Source maps (optional - uncomment if you don't want to commit them)
+# /public/build/**/*.map
+
+# Laravel storage
+/storage/logs/*.log
+/storage/debugbar/
+
+# Laravel storage (compiled/cached contents — keep the dirs via .gitkeep)
+/storage/app/private/*
+!/storage/app/private/.gitkeep
+/storage/app/public/*
+!/storage/app/public/.gitkeep
+/storage/framework/cache/data/*
+!/storage/framework/cache/data/.gitkeep
+/storage/framework/sessions/*
+!/storage/framework/sessions/.gitkeep
+/storage/framework/testing/*
+!/storage/framework/testing/.gitkeep
+/storage/framework/views/*
+!/storage/framework/views/.gitkeep
+
+# Laravel bootstrap cache (generated — config/packages/services/routes/events)
+/bootstrap/cache/*.php
+
+# Claude temp files
+tmpclaude*
+
+# Scribe API documentation generator
+/.scribe/
+/public/docs/index.html
+/public/docs/vendor/
+/public/docs/js/
+/public/docs/css/
+/public/docs/images/

@@ -1,0 +1,8 @@
+/*
+ * Roboto self-hosted via @fontsource/roboto — no external CDN request,
+ * no hanging woff2 fetches in local dev. Only the three weights we use:
+ * 400 (body), 500 (medium), 700 (bold).
+ */
+@import "@fontsource/roboto/latin-400.css";
+@import "@fontsource/roboto/latin-500.css";
+@import "@fontsource/roboto/latin-700.css";

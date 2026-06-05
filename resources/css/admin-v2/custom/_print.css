@@ -1,0 +1,38 @@
+/*  */
+
+@media print {
+    aside.app-menu,
+    .app-header,
+    .footer {
+        @apply !hidden w-0;
+    }
+
+    .page-content,
+    body {
+        padding: 0;
+        margin: 0;
+    }
+
+    .card {
+        box-shadow: none;
+    }
+
+    /* Don't split a single participant row across two pages — at the event,
+       a row torn in half is a manual cross-reference nobody has time for. */
+    table {
+        page-break-inside: auto;
+    }
+    tr {
+        page-break-inside: avoid;
+        page-break-after: auto;
+    }
+    thead {
+        display: table-header-group;
+    }
+    tfoot {
+        display: table-footer-group;
+    }
+    h1, h2, h3, h4 {
+        break-after: avoid;
+    }
+}

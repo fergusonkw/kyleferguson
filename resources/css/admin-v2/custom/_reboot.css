@@ -1,0 +1,69 @@
+/*  */
+
+@layer base {
+    html {
+        @apply relative scroll-smooth;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+        line-height: 1.5 !important;
+        @apply font-secondary font-semibold;
+    }
+
+    body {
+        overflow-x: hidden;
+        -webkit-tap-highlight-color: transparent;
+        @apply font-body text-body bg-body-bg text-body-color size-full leading-normal font-normal antialiased;
+    }
+
+    small {
+        font-size: 0.85em;
+    }
+
+    label {
+        @apply block font-semibold;
+    }
+
+    b,
+    strong {
+        @apply font-semibold;
+    }
+
+    button:not(:disabled),
+    [role="button"]:not(:disabled) {
+        cursor: pointer;
+    }
+
+    code {
+        @apply text-rose-400;
+    }
+
+    /* Default Lucide icons to 1em so they line up with surrounding text.
+     * Tailwind size utilities (size-4, size-5, w-6, etc.) and inline
+     * width/height styles override via higher specificity. */
+    svg.lucide:not([class*="size-"]):not([class*=" w-"]):not([class*=" h-"]):not([style*="width"]) {
+        width: 1em;
+        height: 1em;
+    }
+}
+
+@utility shadow {
+    box-shadow: var(--shadow);
+}
+
+@utility shadow-sm {
+    box-shadow: var(--shadow-sm);
+}
+
+.container {
+    @apply mx-auto max-w-330 px-3;
+}
+
+.container-fluid {
+    @apply w-full max-w-full mx-auto;
+}

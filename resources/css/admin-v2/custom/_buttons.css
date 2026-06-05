@@ -1,0 +1,72 @@
+/* _button.css */
+
+@layer components {
+    .btn {
+        @apply relative z-10 inline-flex cursor-pointer items-center justify-center gap-x-2 rounded;
+        @apply border border-transparent px-4 py-1.75 text-center text-sm font-medium transition-all;
+
+        &.btn-lg {
+            @apply px-5 py-2.25 text-lg rounded;
+        }
+
+        &.btn-icon {
+            @apply size-9.25 p-0;
+        }
+
+        &.btn-sm {
+            @apply px-3 py-1.25 text-xs;
+
+            &.btn-icon {
+                @apply size-7.5 p-0;
+            }
+        }
+    }
+
+    .btn[class*="size-"] {
+        padding: 0 !important;
+    }
+
+    button:disabled {
+        @apply cursor-not-allowed opacity-50;
+    }
+
+    .btn-primary {
+        @apply bg-primary text-white hover:bg-primary-hover;
+    }
+
+    .btn-secondary {
+        @apply bg-secondary text-white hover:bg-secondary-hover;
+    }
+
+    .btn-success {
+        @apply bg-success text-white hover:bg-success-hover;
+    }
+
+    .btn-info {
+        @apply bg-info text-white hover:bg-info-hover;
+    }
+
+    .btn-warning {
+        @apply bg-warning text-white hover:bg-warning-hover;
+    }
+
+    .btn-danger {
+        @apply bg-danger text-white hover:bg-danger-hover;
+    }
+
+    .btn-light {
+        @apply bg-light text-default-800 hover:bg-light-hover hover:text-primary;
+    }
+
+    .btn-dark {
+        @apply bg-dark text-white hover:bg-dark-hover;
+    }
+
+    .btn-outline-primary {
+        @apply border-primary text-primary hover:bg-primary hover:text-white;
+    }
+
+    .btn-outline-secondary {
+        @apply border-secondary text-secondary hover:bg-secondary hover:text-white;
+    }
+}

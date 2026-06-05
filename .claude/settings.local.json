@@ -7,7 +7,23 @@
       "Read(//c/laragon/www/PEITruckAndTractorPull//**)",
       "Read(//c/laragon/www/tracker_pull_mobile_app/**)",
       "mcp__Claude_in_Chrome__list_connected_browsers",
-      "Bash(ls -la /c/Users/fergu/.claude/projects/C--laragon-www-kyleferguson/4e3a8919-f93f-4c08-8bb2-588a3af3a287/ 2>/dev/null | head -30 && echo \"---\" && ls /c/Users/fergu/.claude/projects/C--laragon-www-kyleferguson/4e3a8919-f93f-4c08-8bb2-588a3af3a287/tool-results/ 2>/dev/null | tail -10)"
+      "Bash(ls -la /c/Users/fergu/.claude/projects/C--laragon-www-kyleferguson/4e3a8919-f93f-4c08-8bb2-588a3af3a287/ 2>/dev/null | head -30 && echo \"---\" && ls /c/Users/fergu/.claude/projects/C--laragon-www-kyleferguson/4e3a8919-f93f-4c08-8bb2-588a3af3a287/tool-results/ 2>/dev/null | tail -10)",
+      "Read(//c/laragon/www/admin-starter/public/**)",
+      "Read(//c/laragon/www/admin-starter/routes/**)",
+      "Read(//c/laragon/www/admin-starter/**)",
+      "mcp__laravel-boost__database-schema",
+      "PowerShell(New-Item -ItemType Directory -Force app/Enums/Billing)",
+      "PowerShell(New-Item -ItemType Directory -Force app/Models/Billing)",
+      "PowerShell(New-Item -ItemType Directory -Force \"database/factories/Billing\")",
+      "PowerShell(New-Item -ItemType Directory -Force \"app/Http/Controllers/Admin/Billing\")",
+      "PowerShell(New-Item -ItemType Directory -Force \"app/Http/Requests/Billing\")",
+      "PowerShell(New-Item -ItemType Directory -Force \"app/Policies/Billing\")",
+      "PowerShell(New-Item -ItemType Directory -Force \"app/Services/Billing/DigitalOcean\")",
+      "PowerShell(New-Item -ItemType Directory -Force \"resources/views/admin-v2/billing\")",
+      "PowerShell(\"Done\")",
+      "Bash(php artisan *)",
+      "Bash(vendor/bin/pint --dirty)",
+      "mcp__laravel-boost__search-docs"
     ]
   }
 }

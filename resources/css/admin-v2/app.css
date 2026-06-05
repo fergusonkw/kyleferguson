@@ -1,0 +1,67 @@
+/**
+ * Admin Starter — Admin styles (Tailwind v4 / Preline)
+ *
+ * Minimal entry covering only packages currently installed.
+ * Additional plugin CSS imports (charts, datepickers, editors, etc.) get
+ * added in later sub-sessions as the corresponding packages land.
+ */
+
+@import "./config/_font.css";
+
+@layer base {
+  @import "choices.js/public/assets/styles/choices.min.css";
+}
+
+/* ========= Tailwind CSS ========= */
+@import "tailwindcss";
+
+/* ========= Tailwind Plugins ========= */
+@plugin "@tailwindcss/typography";
+@plugin "@tailwindcss/forms";
+
+/* ========= Preline UI ========= */
+@source "preline/dist/*.js";
+@source "../../views/admin-v2/**/*.blade.php";
+@source "../../js/admin-v2/**/*.js";
+
+/*
+ * Status colours are built dynamically in Blade (e.g. `border-{{ $color }}`,
+ * `bg-{{ $status }}/15`). Tailwind cannot see interpolated class names, so
+ * the full semantic set is safelisted here. Without this, e.g. a cancelled
+ * registration's `border-danger` is purged and renders with no colour.
+ */
+@source inline("{border,bg,text}-{primary,secondary,info,success,warning,danger,default}");
+@source inline("bg-{primary,secondary,info,success,warning,danger,default}/15");
+
+@import "preline/variants.css";
+
+/* ========= Theme config ========= */
+@import "./config/_root.css";
+@import "./config/_theme-default.css";
+@import "./config/_theme-material.css";
+
+/* ========= Structure ========= */
+@import "./structure/_layout.css";
+@import "./structure/_sidenav.css";
+@import "./structure/_horizontal.css";
+@import "./structure/_topbar.css";
+@import "./structure/_footer.css";
+
+/* ========= Custom components ========= */
+@import "./custom/_reboot.css";
+@import "./custom/_helper.css";
+@import "./custom/_buttons.css";
+@import "./custom/_badge.css";
+@import "./custom/_card.css";
+@import "./custom/_dropdown.css";
+@import "./custom/_forms.css";
+@import "./custom/_print.css";
+@import "./custom/_table.css";
+@import "./custom/_pagination.css";
+@import "./custom/_progress.css";
+@import "./custom/_modal.css";
+
+/* ========= Plugin styling (only for packages installed) ========= */
+@import "./plugins/_simplebar.css";
+@import "./plugins/_choice.css";
+@import "./plugins/_datatables.css";

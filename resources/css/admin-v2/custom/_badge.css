@@ -1,0 +1,37 @@
+/* _badge.css */
+
+@layer components {
+    .badge {
+        @apply inline-flex items-center justify-center align-middle gap-1 rounded px-[0.5em] py-[0.15em] text-[0.75em] font-semibold;
+    }
+
+    .badge.rounded-full {
+        @apply px-[0.75em];
+    }
+
+    .badge-label {
+        @apply rounded-none px-[0.8em] py-0.5;
+    }
+
+    /*
+     * Solid semantic badges (`badge bg-success`, `badge bg-warning`, etc.)
+     * need an explicit text colour to stay readable. Without this, the badge
+     * inherits the surrounding context's colour — in dark mode that's a
+     * near-white that washes out on the lighter semantic backgrounds (the
+     * green "Active" pills were the obvious offender). Soft variants like
+     * `bg-X/15 text-X` set their own colour and are unaffected.
+     */
+    .badge.bg-primary,
+    .badge.bg-secondary,
+    .badge.bg-info,
+    .badge.bg-success,
+    .badge.bg-warning,
+    .badge.bg-danger,
+    .badge.bg-dark {
+        @apply text-white;
+    }
+
+    .badge.bg-light {
+        @apply text-default-900;
+    }
+}
