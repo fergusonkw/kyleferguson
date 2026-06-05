@@ -20,7 +20,7 @@
         </div>
 
         {{-- Cost gap summary --}}
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
             <x-admin-v2.stat-card
                 title="DO Billed (USD)"
                 icon="cloud-download"
@@ -29,18 +29,25 @@
                 secondaryColor="info"
             />
             <x-admin-v2.stat-card
-                title="Attributed (USD)"
+                title="This Business (USD)"
                 icon="check-circle"
-                :primaryStatistic="'$'.number_format($data['cost_gap']['attributed_usd'], 2)"
-                secondaryTitle="Mapped to projects"
+                :primaryStatistic="'$'.number_format($data['cost_gap']['attributed_own_usd'], 2)"
+                secondaryTitle="Attributed to own projects"
                 secondaryColor="success"
             />
             <x-admin-v2.stat-card
-                title="Cost Gap (USD)"
+                title="Other Businesses (USD)"
+                icon="building-2"
+                :primaryStatistic="'$'.number_format($data['cost_gap']['attributed_other_usd'], 2)"
+                :secondaryTitle="$data['cost_gap']['attributed_other_usd'] > 0.001 ? 'Cross-business attribution' : 'None this period'"
+                :secondaryColor="$data['cost_gap']['attributed_other_usd'] > 0.001 ? 'warning' : 'default'"
+            />
+            <x-admin-v2.stat-card
+                title="Unattributed (USD)"
                 icon="circle-alert"
-                :primaryStatistic="'$'.number_format($data['cost_gap']['gap_usd'], 2)"
-                :secondaryTitle="$data['cost_gap']['gap_usd'] > 0.001 ? 'Needs attention' : 'Fully attributed'"
-                :secondaryColor="$data['cost_gap']['gap_usd'] > 0.001 ? 'danger' : 'success'"
+                :primaryStatistic="'$'.number_format($data['cost_gap']['unattributed_usd'], 2)"
+                :secondaryTitle="$data['cost_gap']['unattributed_usd'] > 0.001 ? 'Needs attention' : 'Fully attributed'"
+                :secondaryColor="$data['cost_gap']['unattributed_usd'] > 0.001 ? 'danger' : 'success'"
             />
         </div>
 

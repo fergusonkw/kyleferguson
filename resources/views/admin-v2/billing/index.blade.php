@@ -90,9 +90,9 @@
                 <x-admin-v2.stat-card
                     title="Attributed (USD)"
                     icon="check-circle"
-                    :primaryStatistic="'$'.number_format($reconciliation['attributed_usd'], 2)"
-                    secondaryTitle="{{ $reconciliation['gap_usd'] > 0.001 ? 'Gap: $'.number_format($reconciliation['gap_usd'], 2) : 'Fully attributed' }}"
-                    :secondaryColor="$reconciliation['gap_usd'] > 0.001 ? 'warning' : 'success'"
+                    :primaryStatistic="'$'.number_format($reconciliation['attributed_own_usd'], 2)"
+                    secondaryTitle="{{ $reconciliation['unattributed_usd'] > 0.001 ? 'Unattributed: $'.number_format($reconciliation['unattributed_usd'], 2) : 'Fully attributed' }}"
+                    :secondaryColor="$reconciliation['unattributed_usd'] > 0.001 ? 'warning' : 'success'"
                 />
                 <x-admin-v2.stat-card
                     title="Trailing 12-Mo (USD)"

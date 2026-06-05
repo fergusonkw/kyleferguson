@@ -23,10 +23,10 @@ final class ReconciliationReporter
     }
 
     /**
-     * USD total billed by DO in the given period vs. sum of client-attributed
-     * cost line items. Returns both figures so the caller can compute the gap.
+     * USD breakdown for the given period across all line items from this
+     * business's providers, split by where the attribution landed.
      *
-     * @return array{do_total_usd: float, attributed_usd: float, gap_usd: float}
+     * @return array{do_total_usd: float, attributed_own_usd: float, attributed_other_usd: float, unattributed_usd: float}
      */
     public function costGap(Business $business, string $period): array
     {
@@ -35,18 +35,29 @@ final class ReconciliationReporter
             ->whereHas('costProvider', fn ($q) => $q->where('business_id', $business->id));
 
         $doTotal = (float) (clone $base)->sum('usd_amount');
-        $attributed = (float) (clone $base)->whereNotNull('project_id')->sum('usd_amount');
+
+        $attributedOwn = (float) (clone $base)
+            ->whereNotNull('project_id')
+            ->whereHas('project.client', fn ($q) => $q->where('business_id', $business->id))
+            ->sum('usd_amount');
+
+        $attributedOther = (float) (clone $base)
+            ->whereNotNull('project_id')
+            ->whereHas('project.client', fn ($q) => $q->where('business_id', '!=', $business->id))
+            ->sum('usd_amount');
 
         return [
             'do_total_usd' => $doTotal,
-            'attributed_usd' => $attributed,
-            'gap_usd' => $doTotal - $attributed,
+            'attributed_own_usd' => $attributedOwn,
+            'attributed_other_usd' => $attributedOther,
+            'unattributed_usd' => round($doTotal - $attributedOwn - $attributedOther, 2),
         ];
     }
 
     /**
-     * Trailing 12-month revenue per business (sum of attributed USD costs as a
-     * proxy for revenue; Phase 3 will use invoice totals instead).
+     * Trailing 12-month costs attributed to this business's own projects.
+     * Cross-business attributed costs are excluded so that managing a shared
+     * DO account doesn't inflate another business's threshold metric.
      *
      * @return array{periods: list<string>, total_usd: float}
      */
@@ -58,6 +69,7 @@ final class ReconciliationReporter
             ->whereIn('period', $periods)
             ->whereNotNull('project_id')
             ->whereHas('costProvider', fn ($q) => $q->where('business_id', $business->id))
+            ->whereHas('project.client', fn ($q) => $q->where('business_id', $business->id))
             ->sum('usd_amount');
 
         return ['periods' => $periods, 'total_usd' => $total];

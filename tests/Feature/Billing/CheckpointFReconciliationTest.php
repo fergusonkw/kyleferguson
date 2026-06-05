@@ -81,8 +81,9 @@ final class CheckpointFReconciliationTest extends TestCase
         $gap = $reporter->costGap($business, self::PERIOD);
 
         $this->assertEqualsWithDelta(120.0, $gap['do_total_usd'], 0.001);
-        $this->assertEqualsWithDelta(100.0, $gap['attributed_usd'], 0.001);
-        $this->assertEqualsWithDelta(20.0, $gap['gap_usd'], 0.001);
+        $this->assertEqualsWithDelta(100.0, $gap['attributed_own_usd'], 0.001);
+        $this->assertEqualsWithDelta(0.0, $gap['attributed_other_usd'], 0.001);
+        $this->assertEqualsWithDelta(20.0, $gap['unattributed_usd'], 0.001);
     }
 
     public function test_cost_gap_is_zero_when_no_data(): void
@@ -93,7 +94,7 @@ final class CheckpointFReconciliationTest extends TestCase
         $gap = $reporter->costGap($business, self::PERIOD);
 
         $this->assertEqualsWithDelta(0.0, $gap['do_total_usd'], 0.001);
-        $this->assertEqualsWithDelta(0.0, $gap['gap_usd'], 0.001);
+        $this->assertEqualsWithDelta(0.0, $gap['unattributed_usd'], 0.001);
     }
 
     public function test_trailing_12_month_costs_sums_attributed_items(): void

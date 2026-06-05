@@ -56,8 +56,9 @@ final class ProjectSync
     }
 
     /**
-     * Map of DO project UUID → local projects.id for every project belonging to
-     * a client of this provider's business.
+     * Map of DO project UUID → local projects.id across all businesses.
+     * Cross-business attribution is intentional: a single DO account may hold
+     * resources belonging to projects in different businesses.
      *
      * @return array<string, int>
      */
@@ -65,7 +66,6 @@ final class ProjectSync
     {
         return Project::query()
             ->whereNotNull('do_project_uuid')
-            ->whereHas('client', fn ($q) => $q->where('business_id', $provider->business_id))
             ->pluck('id', 'do_project_uuid')
             ->all();
     }

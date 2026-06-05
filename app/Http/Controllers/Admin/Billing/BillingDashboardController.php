@@ -31,8 +31,9 @@ final class BillingDashboardController extends Controller
             $reconciliation = [
                 'unattributed_resources' => $this->reporter->unattributedResourceCount($currentBusiness),
                 'do_total_usd' => $costGap['do_total_usd'],
-                'attributed_usd' => $costGap['attributed_usd'],
-                'gap_usd' => $costGap['gap_usd'],
+                'attributed_own_usd' => $costGap['attributed_own_usd'],
+                'attributed_other_usd' => $costGap['attributed_other_usd'],
+                'unattributed_usd' => $costGap['unattributed_usd'],
                 'trailing_12mo_usd' => $trailing['total_usd'],
                 'period' => $currentPeriod,
             ];
