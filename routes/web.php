@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\Billing\BusinessSwitcherController;
 use App\Http\Controllers\Admin\Billing\ClientController as BillingClientController;
 use App\Http\Controllers\Admin\Billing\CostProviderController;
 use App\Http\Controllers\Admin\Billing\ProjectController as BillingProjectController;
+use App\Http\Controllers\Admin\Billing\ReconciliationController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\LogViewerController;
 use App\Http\Controllers\Admin\MaintenanceController;
@@ -154,5 +155,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'email.verified', '2
         Route::put('cost-providers/{costProvider}', [CostProviderController::class, 'update'])->name('cost-providers.update');
         Route::delete('cost-providers/{costProvider}', [CostProviderController::class, 'destroy'])->name('cost-providers.destroy');
         Route::post('cost-providers/{costProvider}/sync', [CostProviderController::class, 'sync'])->name('cost-providers.sync');
+
+        // Reconciliation
+        Route::get('reconciliation', [ReconciliationController::class, 'index'])->name('reconciliation.index');
     });
 });

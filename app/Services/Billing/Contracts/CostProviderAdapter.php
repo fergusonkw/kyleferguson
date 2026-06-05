@@ -18,4 +18,11 @@ interface CostProviderAdapter
      * Returns the number of resources observed during the sync.
      */
     public function syncProjectsAndResources(CostProvider $provider): int;
+
+    /**
+     * Pull billing data for the given period (YYYY-MM), store the raw payload,
+     * and derive cost line items. Returns the number of line items written.
+     * Idempotent: re-running for an unchanged remote payload is a no-op.
+     */
+    public function syncBilling(CostProvider $provider, string $period): int;
 }

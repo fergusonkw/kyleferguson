@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Billing\DigitalOcean;
 
 use App\Models\Billing\CostProvider;
+use App\Services\Billing\DigitalOcean\Dto\DoInvoice;
 use App\Services\Billing\DigitalOcean\Dto\DoProject;
 use App\Services\Billing\DigitalOcean\Dto\DoResource;
 use Generator;
@@ -66,6 +67,24 @@ final class Client
         foreach ($this->paginate($provider, $path, 'resources') as $payload) {
             yield DoResource::fromApiPayload($payload, $projectUuid);
         }
+    }
+
+    /**
+     * @return Generator<int, DoInvoice>
+     */
+    public function listInvoices(CostProvider $provider): Generator
+    {
+        foreach ($this->paginate($provider, '/customers/my/invoices', 'invoices') as $payload) {
+            yield DoInvoice::summaryFromApiPayload($payload);
+        }
+    }
+
+    public function getInvoice(CostProvider $provider, string $invoiceUuid): DoInvoice
+    {
+        $response = $this->forProvider($provider)->get("/customers/my/invoices/{$invoiceUuid}");
+        $response->throw();
+
+        return DoInvoice::fromApiPayload($response->json());
     }
 
     /**

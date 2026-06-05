@@ -8,14 +8,13 @@ use App\Models\Billing\CostProvider;
 use App\Models\Billing\Project;
 use App\Models\Billing\ProviderResource;
 use App\Models\Billing\ResourceAssignment;
-use App\Services\Billing\Contracts\CostProviderAdapter;
 use App\Services\Billing\DigitalOcean\Dto\DoProject;
 use App\Services\Billing\DigitalOcean\Dto\DoResource;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
-final class ProjectSync implements CostProviderAdapter
+final class ProjectSync
 {
     public function __construct(private readonly Client $client) {}
 

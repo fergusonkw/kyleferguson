@@ -1,0 +1,60 @@
+{
+    "invoice_uuid": "test-invoice-uuid-2026-06",
+    "amount": "150.00",
+    "invoice_period": "2026-06",
+    "updated_at": "2026-06-03T00:00:00Z",
+    "invoice_items": [
+        {
+            "product": "Droplets",
+            "resource_uuid": "droplet-resource-123",
+            "group_description": "",
+            "description": "web-server (ubuntu-s-1vcpu-2gb)",
+            "amount": "12.00",
+            "duration": "720",
+            "duration_unit": "Hours",
+            "start_time": "2026-06-01T00:00:00Z",
+            "end_time": "2026-06-30T00:00:00Z",
+            "project_name": "acme-project",
+            "tax_amount": "0.00"
+        },
+        {
+            "product": "Databases",
+            "resource_uuid": "db-cluster-uuid-456",
+            "group_description": "",
+            "description": "mysql-cluster (db-s-1vcpu-1gb)",
+            "amount": "25.00",
+            "duration": "720",
+            "duration_unit": "Hours",
+            "start_time": "2026-06-01T00:00:00Z",
+            "end_time": "2026-06-30T00:00:00Z",
+            "project_name": "acme-project",
+            "tax_amount": "0.00"
+        },
+        {
+            "product": "Droplets",
+            "resource_uuid": "droplet-resource-789",
+            "group_description": "",
+            "description": "unlinked-server (ubuntu-s-1vcpu-1gb)",
+            "amount": "6.00",
+            "duration": "720",
+            "duration_unit": "Hours",
+            "start_time": "2026-06-01T00:00:00Z",
+            "end_time": "2026-06-30T00:00:00Z",
+            "project_name": "default",
+            "tax_amount": "0.00"
+        },
+        {
+            "product": "Tax",
+            "resource_uuid": "",
+            "group_description": "",
+            "description": "GST/HST",
+            "amount": "5.35",
+            "duration": "",
+            "duration_unit": "",
+            "start_time": "2026-06-01T00:00:00Z",
+            "end_time": "2026-06-30T00:00:00Z",
+            "project_name": "",
+            "tax_amount": "5.35"
+        }
+    ]
+}

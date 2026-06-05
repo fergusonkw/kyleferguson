@@ -2,8 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Jobs\Billing\FetchFxRateJob;
+use App\Jobs\Billing\ReconciliationAlertJob;
+use App\Jobs\Billing\SyncDigitalOceanBillingJob;
 use App\Jobs\Billing\SyncDigitalOceanProjectsJob;
 use App\Jobs\QueueHeartbeat;
+use App\Models\Billing\Business;
 use App\Models\Billing\CostProvider;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -29,3 +33,40 @@ Schedule::call(function (): void {
             SyncDigitalOceanProjectsJob::dispatch($provider->id);
         });
 })->daily()->at('02:00')->name('billing:sync-do-projects')->withoutOverlapping();
+
+// Daily DigitalOcean billing sync per enabled cost provider (current month).
+Schedule::call(function (): void {
+    $period = now()->format('Y-m');
+
+    CostProvider::query()
+        ->where('enabled', true)
+        ->where('slug', 'digitalocean')
+        ->each(function (CostProvider $provider) use ($period): void {
+            SyncDigitalOceanBillingJob::dispatch($provider->id, $period);
+        });
+})->daily()->at('03:00')->name('billing:sync-do-billing')->withoutOverlapping();
+
+// Monthly FX rate fetch for all currency pairs used across businesses.
+// Runs on the 1st of each month so rates are available before draft generation.
+Schedule::call(function (): void {
+    $period = now()->format('Y-m');
+
+    Business::query()
+        ->whereNotNull('supported_currencies')
+        ->each(function (Business $business) use ($period): void {
+            $currencies = $business->supported_currencies ?? [];
+
+            foreach ($currencies as $currency) {
+                if ($currency !== 'USD') {
+                    FetchFxRateJob::dispatch('USD', $currency, $period);
+                }
+            }
+        });
+})->monthlyOn(1, '01:00')->name('billing:fetch-fx-rates')->withoutOverlapping();
+
+// Daily reconciliation alert — flags unattributed resources and cost gaps.
+Schedule::job(new ReconciliationAlertJob)
+    ->daily()
+    ->at('08:00')
+    ->name('billing:reconciliation-alert')
+    ->withoutOverlapping();

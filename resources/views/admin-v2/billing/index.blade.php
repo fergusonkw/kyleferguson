@@ -66,10 +66,42 @@
         />
     </div>
 
-    <x-admin-v2.card class="mt-5">
-        <p class="text-sm text-default-500">
-            Phase 1 brings the foundation: businesses, clients, projects, cost providers, and the DigitalOcean
-            sync. Cost ingestion, invoice generation, and reconciliation arrive in phases 2 and 3.
-        </p>
-    </x-admin-v2.card>
+    @if($reconciliation !== null)
+        <div class="mt-6">
+            <h5 class="text-sm font-semibold text-default-500 uppercase mb-3">
+                Reconciliation — {{ $currentPeriod }}
+            </h5>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+                <x-admin-v2.stat-card
+                    title="Unattributed Resources"
+                    icon="triangle-alert"
+                    :primaryStatistic="$reconciliation['unattributed_resources']"
+                    secondaryTitle="{{ $reconciliation['unattributed_resources'] === 0 ? 'All clear' : 'Need project mapping' }}"
+                    :secondaryColor="$reconciliation['unattributed_resources'] === 0 ? 'success' : 'danger'"
+                />
+                <x-admin-v2.stat-card
+                    title="DO Billed (USD)"
+                    icon="cloud-download"
+                    :primaryStatistic="'$'.number_format($reconciliation['do_total_usd'], 2)"
+                    secondaryTitle="This period"
+                    secondaryColor="info"
+                />
+                <x-admin-v2.stat-card
+                    title="Attributed (USD)"
+                    icon="check-circle"
+                    :primaryStatistic="'$'.number_format($reconciliation['attributed_usd'], 2)"
+                    secondaryTitle="{{ $reconciliation['gap_usd'] > 0.001 ? 'Gap: $'.number_format($reconciliation['gap_usd'], 2) : 'Fully attributed' }}"
+                    :secondaryColor="$reconciliation['gap_usd'] > 0.001 ? 'warning' : 'success'"
+                />
+                <x-admin-v2.stat-card
+                    title="Trailing 12-Mo (USD)"
+                    icon="trending-up"
+                    :primaryStatistic="'$'.number_format($reconciliation['trailing_12mo_usd'], 2)"
+                    secondaryTitle="Attributed costs"
+                    secondaryColor="primary"
+                />
+            </div>
+        </div>
+    @endif
 @endsection

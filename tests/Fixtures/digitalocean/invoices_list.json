@@ -1,0 +1,22 @@
+{
+    "invoices": [
+        {
+            "invoice_uuid": "test-invoice-uuid-2026-06",
+            "amount": "150.00",
+            "invoice_period": "2026-06"
+        },
+        {
+            "invoice_uuid": "test-invoice-uuid-2026-05",
+            "amount": "120.00",
+            "invoice_period": "2026-05"
+        }
+    ],
+    "invoice_preview": {
+        "invoice_uuid": "test-invoice-uuid-2026-06",
+        "amount": "150.00",
+        "invoice_period": "2026-06"
+    },
+    "links": {
+        "pages": {}
+    }
+}

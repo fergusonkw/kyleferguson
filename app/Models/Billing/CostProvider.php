@@ -25,6 +25,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read Business $business
  * @property-read \Illuminate\Database\Eloquent\Collection<int, ProviderResource> $resources
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, ProviderBillingPayload> $billingPayloads
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, CostLineItem> $costLineItems
  *
  * @method static \Database\Factories\Billing\CostProviderFactory factory($count = null, $state = [])
  *
@@ -62,6 +64,18 @@ final class CostProvider extends Model
     public function resources(): HasMany
     {
         return $this->hasMany(ProviderResource::class);
+    }
+
+    /** @return HasMany<ProviderBillingPayload, $this> */
+    public function billingPayloads(): HasMany
+    {
+        return $this->hasMany(ProviderBillingPayload::class);
+    }
+
+    /** @return HasMany<CostLineItem, $this> */
+    public function costLineItems(): HasMany
+    {
+        return $this->hasMany(CostLineItem::class);
     }
 
     public function markSyncRunning(): void
