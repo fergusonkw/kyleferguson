@@ -8,6 +8,9 @@ use App\Http\Controllers\Admin\Billing\BusinessController;
 use App\Http\Controllers\Admin\Billing\BusinessSwitcherController;
 use App\Http\Controllers\Admin\Billing\ClientController as BillingClientController;
 use App\Http\Controllers\Admin\Billing\CostProviderController;
+use App\Http\Controllers\Admin\Billing\InvoiceController;
+use App\Http\Controllers\Admin\Billing\InvoiceLineController;
+use App\Http\Controllers\Admin\Billing\PaymentController;
 use App\Http\Controllers\Admin\Billing\ProjectController as BillingProjectController;
 use App\Http\Controllers\Admin\Billing\ReconciliationController;
 use App\Http\Controllers\Admin\DashboardController;
@@ -21,6 +24,7 @@ use App\Http\Controllers\Admin\UserSettingsController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\TwoFactorChallengeController;
+use App\Http\Controllers\HostedInvoiceController;
 use Illuminate\Support\Facades\Route;
 
 // The marketing site lives as static files in public/index.html. Apache
@@ -158,5 +162,27 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'email.verified', '2
 
         // Reconciliation
         Route::get('reconciliation', [ReconciliationController::class, 'index'])->name('reconciliation.index');
+
+        // Invoices
+        Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices.index');
+        Route::get('invoices/data', [InvoiceController::class, 'data'])->name('invoices.data');
+        Route::post('invoices/generate', [InvoiceController::class, 'generate'])->name('invoices.generate');
+        Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
+        Route::post('invoices/{invoice}/approve', [InvoiceController::class, 'approve'])->name('invoices.approve');
+        Route::post('invoices/{invoice}/send', [InvoiceController::class, 'send'])->name('invoices.send');
+        Route::post('invoices/{invoice}/void', [InvoiceController::class, 'void'])->name('invoices.void');
+        Route::get('invoices/{invoice}/download', [InvoiceController::class, 'download'])->name('invoices.download');
+
+        // Invoice lines
+        Route::post('invoices/{invoice}/lines', [InvoiceLineController::class, 'store'])->name('invoice-lines.store');
+        Route::put('invoice-lines/{invoiceLine}', [InvoiceLineController::class, 'update'])->name('invoice-lines.update');
+        Route::delete('invoice-lines/{invoiceLine}', [InvoiceLineController::class, 'destroy'])->name('invoice-lines.destroy');
+
+        // Payments
+        Route::post('invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('payments.store');
+        Route::delete('payments/{payment}', [PaymentController::class, 'destroy'])->name('payments.destroy');
     });
 });
+
+// Hosted invoice view (public — no auth required)
+Route::get('/invoices/{token}', [HostedInvoiceController::class, 'show'])->name('invoices.hosted');

@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Jobs\Billing\DraftReminderDigestJob;
 use App\Jobs\Billing\FetchFxRateJob;
+use App\Jobs\Billing\GenerateMonthlyDraftsJob;
 use App\Jobs\Billing\ReconciliationAlertJob;
 use App\Jobs\Billing\SyncDigitalOceanBillingJob;
 use App\Jobs\Billing\SyncDigitalOceanProjectsJob;
@@ -63,6 +65,25 @@ Schedule::call(function (): void {
             }
         });
 })->monthlyOn(1, '01:00')->name('billing:fetch-fx-rates')->withoutOverlapping();
+
+// Monthly draft generation — runs on the 1st after FX rates are fetched.
+Schedule::call(function (): void {
+    $period = now()->format('Y-m');
+
+    Business::query()
+        ->each(function (Business $business) use ($period): void {
+            GenerateMonthlyDraftsJob::dispatch($business->id, $period);
+        });
+})->monthlyOn(1, '06:00')->name('billing:generate-monthly-drafts')->withoutOverlapping();
+
+// Daily draft reminder digest — per business, at the business's configured time.
+// We dispatch for all businesses and let the job skip those with no old drafts.
+Schedule::call(function (): void {
+    Business::query()
+        ->each(function (Business $business): void {
+            DraftReminderDigestJob::dispatch($business->id);
+        });
+})->daily()->name('billing:draft-reminder-digest')->withoutOverlapping();
 
 // Daily reconciliation alert — flags unattributed resources and cost gaps.
 Schedule::job(new ReconciliationAlertJob)

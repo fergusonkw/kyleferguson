@@ -33,6 +33,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Client> $clients
  * @property-read \Illuminate\Database\Eloquent\Collection<int, CostProvider> $costProviders
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, Invoice> $invoices
  *
  * @method static \Database\Factories\Billing\BusinessFactory factory($count = null, $state = [])
  *
@@ -75,6 +76,12 @@ final class Business extends Model
     public function costProviders(): HasMany
     {
         return $this->hasMany(CostProvider::class);
+    }
+
+    /** @return HasMany<Invoice, $this> */
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class);
     }
 
     /**
