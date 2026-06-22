@@ -10,7 +10,7 @@ jobs:
     name: Lint & Security
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Setup PHP
         uses: shivammathur/setup-php@a919ff576a94b0fd7ec15f090dd9cf16b76c2c0b
@@ -50,7 +50,7 @@ jobs:
     name: Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Setup PHP
         uses: shivammathur/setup-php@a919ff576a94b0fd7ec15f090dd9cf16b76c2c0b
