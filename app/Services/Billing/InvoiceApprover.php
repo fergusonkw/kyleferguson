@@ -86,6 +86,11 @@ final class InvoiceApprover
     /**
      * Move to a payment-derived status. Only {@see PaymentRecorder} should call
      * this — an operator cannot mark an invoice paid without a payment record.
+     *
+     * Movement is free within the payment-tracked set, since voiding payments
+     * has to be able to walk a status back, but a payment can never drag an
+     * invoice into or out of that set: it cannot revive a void invoice or
+     * approve a draft.
      */
     public function applyPaymentStatus(Invoice $invoice, InvoiceStatus $status): Invoice
     {
@@ -93,7 +98,9 @@ final class InvoiceApprover
             return $invoice;
         }
 
-        $this->assertCanTransitionTo($invoice, $status);
+        if (! $invoice->status->isPaymentTracked() || ! $status->isPaymentTracked()) {
+            throw InvalidInvoiceTransition::between($invoice, $status);
+        }
 
         return $this->apply($invoice, $status, function (Invoice $invoice) use ($status): void {
             $invoice->forceFill(['status' => $status])->save();

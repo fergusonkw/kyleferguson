@@ -115,12 +115,31 @@ final class CheckpointE0InvoiceSchemaTest extends TestCase
     {
         $this->assertTrue(InvoiceStatus::Draft->canTransitionTo(InvoiceStatus::Approved));
         $this->assertTrue(InvoiceStatus::Approved->canTransitionTo(InvoiceStatus::Sent));
-        $this->assertTrue(InvoiceStatus::Sent->canTransitionTo(InvoiceStatus::Paid));
 
         $this->assertFalse(InvoiceStatus::Draft->canTransitionTo(InvoiceStatus::Sent));
         $this->assertFalse(InvoiceStatus::Draft->canTransitionTo(InvoiceStatus::Paid));
         $this->assertFalse(InvoiceStatus::Void->canTransitionTo(InvoiceStatus::Draft));
         $this->assertFalse(InvoiceStatus::Paid->canTransitionTo(InvoiceStatus::Draft));
+    }
+
+    public function test_payment_statuses_are_not_operator_choosable(): void
+    {
+        // They are computed from the payment total, so no operator transition
+        // may reach them — only PaymentRecorder can, via isPaymentTracked().
+        $this->assertFalse(InvoiceStatus::Sent->canTransitionTo(InvoiceStatus::Paid));
+        $this->assertFalse(InvoiceStatus::Approved->canTransitionTo(InvoiceStatus::PartiallyPaid));
+        $this->assertFalse(InvoiceStatus::PartiallyPaid->canTransitionTo(InvoiceStatus::Paid));
+    }
+
+    public function test_payment_tracked_statuses_are_the_live_billable_ones(): void
+    {
+        $this->assertTrue(InvoiceStatus::Approved->isPaymentTracked());
+        $this->assertTrue(InvoiceStatus::Sent->isPaymentTracked());
+        $this->assertTrue(InvoiceStatus::PartiallyPaid->isPaymentTracked());
+        $this->assertTrue(InvoiceStatus::Paid->isPaymentTracked());
+
+        $this->assertFalse(InvoiceStatus::Draft->isPaymentTracked());
+        $this->assertFalse(InvoiceStatus::Void->isPaymentTracked());
     }
 
     public function test_any_live_status_can_be_voided(): void

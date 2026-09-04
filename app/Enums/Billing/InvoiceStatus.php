@@ -51,8 +51,11 @@ enum InvoiceStatus: string
     }
 
     /**
-     * Statuses this one may move to. Payment-derived statuses are reached by
-     * recording payments, never by a direct transition.
+     * Statuses an operator may move this one to.
+     *
+     * Payment-derived statuses are deliberately absent: they are computed from
+     * the payment total, never chosen. {@see self::isPaymentTracked()} governs
+     * those, so no one can mark an invoice paid without a payment behind it.
      *
      * @return list<self>
      */
@@ -61,9 +64,9 @@ enum InvoiceStatus: string
         return match ($this) {
             self::Draft => [self::Approved, self::Void],
             self::Approved => [self::Sent, self::Void],
-            self::Sent => [self::PartiallyPaid, self::Paid, self::Void],
-            self::PartiallyPaid => [self::Paid, self::Void],
-            self::Paid => [self::PartiallyPaid, self::Void],
+            self::Sent => [self::Void],
+            self::PartiallyPaid => [self::Void],
+            self::Paid => [self::Void],
             self::Void => [],
         };
     }
@@ -71,6 +74,22 @@ enum InvoiceStatus: string
     public function canTransitionTo(self $target): bool
     {
         return in_array($target, $this->allowedTransitions(), true);
+    }
+
+    /**
+     * Whether this status is one the payment total determines.
+     *
+     * An invoice can be paid before it is marked sent (a client who pays on
+     * the spot), and voiding every payment has to return it to whatever it was
+     * before — so movement within this set is free in both directions, while
+     * moving into or out of it is not a payment's business.
+     */
+    public function isPaymentTracked(): bool
+    {
+        return match ($this) {
+            self::Approved, self::Sent, self::PartiallyPaid, self::Paid => true,
+            default => false,
+        };
     }
 
     /**
