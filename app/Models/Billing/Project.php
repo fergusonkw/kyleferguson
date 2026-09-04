@@ -66,6 +66,12 @@ final class Project extends Model
         return $this->hasMany(CostLineItem::class);
     }
 
+    /** @return HasMany<RecurringLineTemplate, $this> */
+    public function recurringLineTemplates(): HasMany
+    {
+        return $this->hasMany(RecurringLineTemplate::class);
+    }
+
     /**
      * The markup type effective for this project (falls back to client default).
      */

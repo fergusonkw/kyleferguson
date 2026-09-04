@@ -77,6 +77,12 @@ final class Business extends Model
         return $this->hasMany(CostProvider::class);
     }
 
+    /** @return HasMany<Invoice, $this> */
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class);
+    }
+
     /**
      * Whether the business is currently GST/HST registered as of $on.
      */

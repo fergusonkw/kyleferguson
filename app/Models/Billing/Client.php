@@ -27,6 +27,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read Business $business
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Project> $projects
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, Invoice> $invoices
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, RecurringLineTemplate> $recurringLineTemplates
  *
  * @method static \Database\Factories\Billing\ClientFactory factory($count = null, $state = [])
  *
@@ -61,6 +63,18 @@ final class Client extends Model
     public function projects(): HasMany
     {
         return $this->hasMany(Project::class);
+    }
+
+    /** @return HasMany<Invoice, $this> */
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class);
+    }
+
+    /** @return HasMany<RecurringLineTemplate, $this> */
+    public function recurringLineTemplates(): HasMany
+    {
+        return $this->hasMany(RecurringLineTemplate::class);
     }
 
     /**
