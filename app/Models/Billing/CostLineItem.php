@@ -134,6 +134,20 @@ final class CostLineItem extends Model
         );
     }
 
+    /**
+     * How the hosting line that bills this cost refers back to it.
+     *
+     * Attribution says whose cost this is; this says whether anyone has
+     * actually been charged for it. The two are independent — deleting an
+     * invoice does not change which project incurred the cost.
+     */
+    public function invoiceSourceReference(): ?string
+    {
+        return $this->project_id === null
+            ? null
+            : "cost_line_items:period={$this->period};project={$this->project_id}";
+    }
+
     public function attributionState(): CostAttributionState
     {
         if (! $this->category->isAttributable()) {

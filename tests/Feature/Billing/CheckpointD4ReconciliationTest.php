@@ -261,6 +261,84 @@ final class CheckpointD4ReconciliationTest extends TestCase
         $this->assertSame(12.0, $series[0]['cost']);
     }
 
+    public function test_an_attributed_cost_with_no_invoice_is_reported_as_uninvoiced(): void
+    {
+        // Attribution says whose cost it is; billing says whether anyone has
+        // been charged. Conflating them hides unbilled work.
+        $project = Project::factory()->for($this->client)->create();
+        $this->line(30.0, project: $project);
+
+        $summary = $this->reporter()->summarize($this->business->id, self::PERIOD);
+
+        $this->assertSame(30.0, $summary->attributedCost);
+        $this->assertSame(30.0, $summary->uninvoicedCost);
+    }
+
+    public function test_a_cost_on_a_live_invoice_is_no_longer_uninvoiced(): void
+    {
+        $project = Project::factory()->for($this->client)->create();
+        $this->line(30.0, project: $project);
+        $this->invoiceCovering($project, \App\Enums\Billing\InvoiceStatus::Sent);
+
+        $this->assertSame(0.0, $this->reporter()->summarize($this->business->id, self::PERIOD)->uninvoicedCost);
+    }
+
+    public function test_voiding_the_invoice_makes_the_cost_uninvoiced_again(): void
+    {
+        $project = Project::factory()->for($this->client)->create();
+        $this->line(30.0, project: $project);
+        $invoice = $this->invoiceCovering($project, \App\Enums\Billing\InvoiceStatus::Sent);
+
+        $invoice->forceFill(['status' => \App\Enums\Billing\InvoiceStatus::Void])->save();
+
+        $this->assertSame(30.0, $this->reporter()->summarize($this->business->id, self::PERIOD)->uninvoicedCost);
+    }
+
+    public function test_deleting_the_invoice_leaves_the_cost_attributed_but_uninvoiced(): void
+    {
+        // Deleting an invoice does not change which project incurred the cost,
+        // so attribution survives — but nobody has been charged any more.
+        $project = Project::factory()->for($this->client)->create();
+        $line = $this->line(30.0, project: $project);
+        $invoice = $this->invoiceCovering($project, \App\Enums\Billing\InvoiceStatus::Sent);
+
+        $invoice->delete();
+
+        $summary = $this->reporter()->summarize($this->business->id, self::PERIOD);
+        $this->assertNotNull($line->fresh()->project_id);
+        $this->assertSame(30.0, $summary->attributedCost);
+        $this->assertSame(30.0, $summary->uninvoicedCost);
+    }
+
+    public function test_an_unattributed_cost_is_not_counted_as_uninvoiced(): void
+    {
+        // It is already reported as unattributed; counting it twice would
+        // double the apparent problem.
+        $this->line(30.0);
+
+        $this->assertSame(0.0, $this->reporter()->summarize($this->business->id, self::PERIOD)->uninvoicedCost);
+    }
+
+    public function test_the_line_items_table_says_whether_each_cost_was_invoiced(): void
+    {
+        $project = Project::factory()->for($this->client)->create();
+        $this->line(30.0, project: $project);
+
+        $response = $this->actingAs($this->createAdmin())
+            ->getJson(route('admin.billing.reconciliation.line-items', ['period' => self::PERIOD]))
+            ->assertOk();
+
+        $this->assertStringContainsString('Not invoiced', $response->json('data.0.billed'));
+
+        $this->invoiceCovering($project, \App\Enums\Billing\InvoiceStatus::Sent);
+
+        $after = $this->actingAs($this->createAdmin())
+            ->getJson(route('admin.billing.reconciliation.line-items', ['period' => self::PERIOD]))
+            ->assertOk();
+
+        $this->assertStringContainsString('Invoiced', $after->json('data.0.billed'));
+    }
+
     public function test_attribution_can_be_re_run_from_the_reconciliation_page(): void
     {
         // Ingestion and attribution run on separate schedules, so a freshly
@@ -309,6 +387,23 @@ final class CheckpointD4ReconciliationTest extends TestCase
     private function reporter(): ReconciliationReporter
     {
         return app(ReconciliationReporter::class);
+    }
+
+    /**
+     * An invoice whose hosting line bills the given project for the period,
+     * referenced the way InvoiceBuilder writes it.
+     */
+    private function invoiceCovering(Project $project, \App\Enums\Billing\InvoiceStatus $status): \App\Models\Billing\Invoice
+    {
+        $invoice = \App\Models\Billing\Invoice::factory()
+            ->for($this->business)->for($this->client)
+            ->forPeriod(self::PERIOD)->status($status)->create();
+
+        \App\Models\Billing\InvoiceLine::factory()->for($invoice)
+            ->ofType(\App\Enums\Billing\InvoiceLineType::Hosting)
+            ->create(['source_reference' => 'cost_line_items:period='.self::PERIOD.";project={$project->id}"]);
+
+        return $invoice;
     }
 
     private function line(

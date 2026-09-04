@@ -58,7 +58,7 @@
             />
         @endif
 
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-5">
             <x-admin-v2.stat-card
                 title="Attributed"
                 icon="circle-check"
@@ -74,6 +74,14 @@
                 :animateCounter="false"
                 :secondaryTitle="$summary->unattributedResourceCount . ' resource(s) unassigned'"
                 :secondaryColor="$summary->unattributedCost > 0 || $summary->unattributedResourceCount > 0 ? 'warning' : 'success'"
+            />
+            <x-admin-v2.stat-card
+                title="Not invoiced"
+                icon="receipt"
+                :primaryStatistic="$money($summary->uninvoicedCost)"
+                :animateCounter="false"
+                secondaryTitle="Attributed, nobody charged yet"
+                :secondaryColor="$summary->uninvoicedCost > 0 ? 'warning' : 'success'"
             />
             <x-admin-v2.stat-card
                 title="Overhead"
@@ -170,6 +178,7 @@
                     ['title' => 'Client', 'data' => 'client'],
                     ['title' => 'Project', 'data' => 'project'],
                     ['title' => 'State', 'data' => 'state', 'orderable' => false, 'className' => 'text-center'],
+                    ['title' => 'Billed', 'data' => 'billed', 'orderable' => false, 'className' => 'text-center'],
                     ['title' => 'Cost', 'data' => 'cost', 'orderable' => false, 'className' => 'text-end'],
                 ]"
                 ajax-url="{{ route('admin.billing.reconciliation.line-items', ['period' => $period]) }}"

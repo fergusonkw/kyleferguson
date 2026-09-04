@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Admin\Billing;
 
+use App\Enums\Billing\CostAttributionState;
 use App\Http\Controllers\Controller;
 use App\Models\Billing\CostLineItem;
 use App\Services\Billing\BillingPeriod;
@@ -84,11 +85,17 @@ final class ReconciliationController extends Controller
             ->take($length)
             ->get();
 
+        // Resolved once for the page rather than once per row.
+        $billed = $this->reporter->billedReferences($business->id, $period);
+
         return response()->json([
             'draw' => $draw,
             'recordsTotal' => $total,
             'recordsFiltered' => $total,
-            'data' => $lines->map(fn (CostLineItem $line): array => $this->presentLine($line)),
+            'data' => $lines->map(fn (CostLineItem $line): array => $this->presentLine(
+                $line,
+                $billed->contains($line->invoiceSourceReference()),
+            )),
         ]);
     }
 
@@ -130,11 +137,19 @@ final class ReconciliationController extends Controller
     /**
      * @return array<string, string>
      */
-    private function presentLine(CostLineItem $line): array
+    private function presentLine(CostLineItem $line, bool $isBilled): array
     {
         $state = $line->attributionState();
 
         return [
+            // Attributed says whose cost it is; billed says whether anyone has
+            // actually been charged. An attributed cost that is not billed is
+            // unbilled work, and looks identical to a billed one without this.
+            'billed' => $state === CostAttributionState::Attributed
+                ? ($isBilled
+                    ? '<span class="badge bg-success">Invoiced</span>'
+                    : '<span class="badge bg-warning">Not invoiced</span>')
+                : '<em class="text-default-400">—</em>',
             'provider' => e($line->costProvider->display_name),
             'description' => e($line->description),
             'category' => e($line->category->label()),
