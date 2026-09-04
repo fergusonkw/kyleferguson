@@ -98,6 +98,51 @@ final class CheckpointE9DatesAndDeletionTest extends TestCase
         $this->assertStringContainsString('Cheque payable to:', $html);
     }
 
+    public function test_rebuilding_a_draft_picks_up_a_newly_set_payee(): void
+    {
+        $invoice = app(\App\Services\Billing\InvoiceBuilder::class)->build($this->client, $this->draft()->period);
+        $this->assertNull($invoice->business_snapshot['cheque_payable_to']);
+
+        $this->business->update(['cheque_payable_to' => 'Kyle Ferguson']);
+
+        $rebuilt = app(\App\Services\Billing\InvoiceBuilder::class)->build($this->client, $invoice->period);
+
+        $this->assertSame('Kyle Ferguson', $rebuilt->business_snapshot['cheque_payable_to']);
+    }
+
+    public function test_approval_freezes_the_business_as_it_is_at_that_moment(): void
+    {
+        // Configuring a business after generating a draft but before approving
+        // it must not issue an invoice carrying details already corrected.
+        $invoice = $this->billable();
+        $this->assertNull($invoice->business_snapshot['cheque_payable_to'] ?? null);
+
+        $this->business->update([
+            'cheque_payable_to' => 'Kyle Ferguson',
+            'late_fee_terms' => '2% monthly interest after 30 days.',
+        ]);
+
+        $approved = app(InvoiceApprover::class)->approve($invoice);
+
+        $this->assertSame('Kyle Ferguson', $approved->business_snapshot['cheque_payable_to']);
+        $this->assertSame('2% monthly interest after 30 days.', $approved->late_fee_terms_snapshot);
+        $this->assertStringContainsString(
+            'Cheque payable to:',
+            app(InvoicePdfRenderer::class)->html($approved->fresh()),
+        );
+    }
+
+    public function test_an_issued_invoice_stops_following_the_business(): void
+    {
+        $approved = app(InvoiceApprover::class)->approve($this->billable());
+
+        $this->business->update(['name' => 'Renamed After Issue', 'cheque_payable_to' => 'Someone Else']);
+
+        $fresh = $approved->fresh();
+        $this->assertSame('Kyle Ferguson', $fresh->business_snapshot['name']);
+        $this->assertNotSame('Someone Else', $fresh->business_snapshot['cheque_payable_to'] ?? null);
+    }
+
     // ---- Due dates ---------------------------------------------------------
 
     public function test_approval_calculates_the_due_date_from_the_terms(): void

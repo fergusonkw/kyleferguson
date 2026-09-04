@@ -19,7 +19,10 @@ use Illuminate\Support\Facades\DB;
  */
 final class InvoiceApprover
 {
-    public function __construct(private readonly AuditLogger $audit) {}
+    public function __construct(
+        private readonly AuditLogger $audit,
+        private readonly InvoiceSnapshotter $snapshots,
+    ) {}
 
     /**
      * Draft to approved. This is the moment the operator takes responsibility
@@ -39,6 +42,13 @@ final class InvoiceApprover
 
         return $this->apply($invoice, InvoiceStatus::Approved, function (Invoice $invoice): void {
             $issuedOn = now();
+
+            // Approval is the moment the invoice becomes a permanent record, so
+            // it freezes the business and client as they are *now* — not as
+            // they were when the draft was first generated. Configuring a
+            // business between the two would otherwise issue an invoice
+            // carrying details the operator had already corrected.
+            $this->snapshots->capture($invoice);
 
             // A due date set by hand on the draft is a deliberate choice —
             // "due on receipt", a date negotiated for this one invoice — so

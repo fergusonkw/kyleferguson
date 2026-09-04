@@ -35,6 +35,7 @@ final class InvoiceBuilder
     public function __construct(
         private readonly FxRateService $fxRates,
         private readonly InvoiceNumberAllocator $numbers,
+        private readonly InvoiceSnapshotter $snapshots,
     ) {}
 
     /**
@@ -71,12 +72,12 @@ final class InvoiceBuilder
                 'fx_rate_snapshot' => $rate,
                 'fx_rate_source' => $fxRecord?->source->value ?? 'internal',
                 'fx_rate_period' => $period,
-                'template_view_snapshot' => $business->invoice_template_view,
-                'email_template_view_snapshot' => $business->email_template_view,
-                'late_fee_terms_snapshot' => $business->late_fee_terms,
-                'business_snapshot' => $this->snapshotBusiness($business),
-                'client_snapshot' => $this->snapshotClient($client),
-            ])->save();
+            ]);
+
+            // A draft is still a working document, so rebuilding re-takes the
+            // business and client details rather than keeping the first copy.
+            $this->snapshots->capture($invoice);
+            $invoice->save();
 
             // Derived lines are rebuilt from source each run; manual additions
             // an operator made during review are left alone.
@@ -447,36 +448,5 @@ final class InvoiceBuilder
     private function convert(string $usd, string $rate): string
     {
         return number_format((float) bcmul($usd, $rate, 8), 2, '.', '');
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function snapshotBusiness(Business $business): array
-    {
-        return [
-            'name' => $business->name,
-            'legal_name' => $business->legal_name,
-            'address' => $business->address,
-            'contact_email' => $business->contact_email,
-            'cheque_payable_to' => $business->cheque_payable_to,
-            'logo_path' => $business->logo_path,
-            'brand_primary_color' => $business->brand_primary_color,
-            'brand_secondary_color' => $business->brand_secondary_color,
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function snapshotClient(Client $client): array
-    {
-        return [
-            'name' => $client->name,
-            'contact_name' => $client->contact_name,
-            'contact_email' => $client->contact_email,
-            'billing_address' => $client->billing_address,
-            'billing_currency' => $client->billing_currency,
-        ];
     }
 }
