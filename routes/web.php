@@ -180,6 +180,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'email.verified', '2
         // Reconciliation
         Route::get('reconciliation', [ReconciliationController::class, 'index'])->name('reconciliation.index');
         Route::get('reconciliation/line-items', [ReconciliationController::class, 'lineItems'])->name('reconciliation.line-items');
+        Route::post('reconciliation/attribute', [ReconciliationController::class, 'attribute'])->name('reconciliation.attribute');
 
         // Cost providers
         Route::get('cost-providers', [CostProviderController::class, 'index'])->name('cost-providers.index');

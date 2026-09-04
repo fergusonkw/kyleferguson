@@ -37,11 +37,18 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="text-sm text-default-400 pb-2">
+                <div class="text-sm text-default-400 pb-2 grow">
                     Showing <span class="font-medium text-default-700">{{ $business->name }}</span> ·
                     all figures are the USD cost basis
                 </div>
+                <button type="button" class="btn btn-light mb-1" id="attributeBtn">
+                    <i data-lucide="refresh-cw" class="size-4 me-1"></i> Re-attribute costs
+                </button>
             </form>
+            <p class="text-xs text-default-400 mt-2">
+                Ingested costs are matched to projects nightly. Run it now after connecting a provider or
+                pointing a resource at a project — an unattributed cost cannot reach an invoice.
+            </p>
         </x-admin-v2.card>
 
         @if($summary->needsAttention())
@@ -172,3 +179,44 @@
         </x-admin-v2.card>
     @endif
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const btn = document.getElementById('attributeBtn');
+    if (!btn) return;
+
+    btn.addEventListener('click', async () => {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+        const period = document.getElementById('period')?.value ?? '';
+        const label = btn.innerHTML;
+        btn.disabled = true;
+        btn.textContent = 'Attributing...';
+
+        try {
+            const body = new FormData();
+            body.append('period', period);
+
+            const r = await fetch(@json(route('admin.billing.reconciliation.attribute'), JSON_UNESCAPED_SLASHES), {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                body,
+            });
+            const data = await r.json();
+
+            if (data.success) {
+                Alert.toast(data.message, 'success');
+                setTimeout(() => window.location.reload(), 900);
+            } else {
+                Alert.error(data.message || 'Could not attribute costs.');
+            }
+        } catch {
+            Alert.error('Could not attribute costs.');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = label;
+        }
+    });
+});
+</script>
+@endpush

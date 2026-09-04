@@ -261,6 +261,51 @@ final class CheckpointD4ReconciliationTest extends TestCase
         $this->assertSame(12.0, $series[0]['cost']);
     }
 
+    public function test_attribution_can_be_re_run_from_the_reconciliation_page(): void
+    {
+        // Ingestion and attribution run on separate schedules, so a freshly
+        // synced cost sits unattributed until the nightly pass. Without an
+        // on-demand trigger the operator waits overnight to see their own
+        // change take effect — and an unattributed cost reaches no invoice.
+        $project = Project::factory()->for($this->client)->create();
+        $resource = ProviderResource::factory()->for($this->provider, 'costProvider')
+            ->attributedTo($project)->create();
+
+        \App\Models\Billing\ResourceAssignment::create([
+            'provider_resource_id' => $resource->id,
+            'project_id' => $project->id,
+            'observed_from' => now()->subMonth(),
+            'observed_to' => null,
+        ]);
+
+        $line = CostLineItem::factory()->forResource($resource)->forPeriod(self::PERIOD)->usd(30.0)->create();
+        $this->assertNull($line->project_id);
+
+        $this->actingAs($this->createAdmin())
+            ->postJson(route('admin.billing.reconciliation.attribute'), ['period' => self::PERIOD])
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertSame($project->id, $line->fresh()->project_id);
+        $this->assertNotNull($line->fresh()->attributed_at);
+    }
+
+    public function test_re_running_attribution_on_an_empty_period_says_so(): void
+    {
+        $this->actingAs($this->createAdmin())
+            ->postJson(route('admin.billing.reconciliation.attribute'), ['period' => '2026-01'])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonFragment(['message' => 'No costs ingested for January 2026 yet.']);
+    }
+
+    public function test_re_running_attribution_requires_billing_permission(): void
+    {
+        $this->actingAs($this->createUserWithRole(\App\Enums\Role::User->slug()))
+            ->postJson(route('admin.billing.reconciliation.attribute'))
+            ->assertForbidden();
+    }
+
     private function reporter(): ReconciliationReporter
     {
         return app(ReconciliationReporter::class);

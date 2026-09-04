@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Admin\Billing;
 use App\Http\Controllers\Controller;
 use App\Models\Billing\CostLineItem;
 use App\Services\Billing\BillingPeriod;
+use App\Services\Billing\CostAttributor;
 use App\Services\Billing\CurrentBusiness;
 use App\Services\Billing\ReconciliationReporter;
 use Illuminate\Http\JsonResponse;
@@ -88,6 +89,41 @@ final class ReconciliationController extends Controller
             'recordsTotal' => $total,
             'recordsFiltered' => $total,
             'data' => $lines->map(fn (CostLineItem $line): array => $this->presentLine($line)),
+        ]);
+    }
+
+    /**
+     * Re-run attribution for the period on demand.
+     *
+     * Ingestion and attribution are separate steps on separate schedules, so a
+     * cost that has just synced — or a resource just pointed at a project —
+     * sits unattributed until the nightly pass. Without this the operator has
+     * to wait overnight to see their own change take effect.
+     */
+    public function attribute(Request $request, CostAttributor $attributor): JsonResponse
+    {
+        $this->authorize('viewAny-billing');
+
+        $business = $this->currentBusiness->get();
+
+        if ($business === null) {
+            return response()->json(['success' => false, 'message' => 'No business selected.'], 422);
+        }
+
+        $period = $this->resolvePeriod($request);
+        $result = $attributor->attribute($business->id, $period);
+
+        return response()->json([
+            'success' => true,
+            'message' => $result->processed === 0
+                ? 'No costs ingested for '.BillingPeriod::label($period).' yet.'
+                : sprintf(
+                    '%d cost line(s) processed for %s — %d attributed, %d still unattributed.',
+                    $result->processed,
+                    BillingPeriod::label($period),
+                    $result->attributed,
+                    $result->unattributed,
+                ),
         ]);
     }
 
