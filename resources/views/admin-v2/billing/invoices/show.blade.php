@@ -137,6 +137,9 @@
                                                 @endforeach
                                             </div>
                                         @endif
+                                        @if($line->rateNote())
+                                            <div class="text-xs text-default-500 mt-1">{{ $line->rateNote() }}</div>
+                                        @endif
                                         @if($line->conversionNote())
                                             <div class="text-xs text-default-400 mt-1">{{ $line->conversionNote() }}</div>
                                         @endif
@@ -282,18 +285,28 @@
                 <x-admin-v2.form.textarea name="description" label="Details" rows="4"
                                           placeholder="What this line covers. Shown to the client under the title — use it to break down a large figure." />
                 <x-admin-v2.form.select name="line_type" label="Type" :required="true" :options="$lineTypes" />
+
+                {{-- Work billed by the hour or the unit: the amount is worked
+                     out from these, so the client can check the figure. --}}
+                <div class="grid grid-cols-3 gap-3">
+                    <x-admin-v2.form.input name="quantity" type="number" step="0.01" min="0" label="Quantity" placeholder="12" />
+                    <x-admin-v2.form.input name="unit" label="Unit" placeholder="hrs" maxlength="32" />
+                    <x-admin-v2.form.input name="unit_rate" type="number" step="0.01" label="Rate" placeholder="95.00" />
+                </div>
+
                 <div class="grid grid-cols-3 gap-3">
                     <div class="col-span-2">
-                        <x-admin-v2.form.input name="amount" type="number" step="0.01" label="Amount" :required="true" placeholder="0.00" />
+                        <x-admin-v2.form.input name="amount" type="number" step="0.01" label="Amount" placeholder="0.00" />
                     </div>
                     <x-admin-v2.form.select name="currency" label="Currency" :options="$lineCurrencies"
                                             :selected="$invoice->issue_currency" />
                 </div>
-                <p class="text-xs text-default-400 -mt-2 mb-3">
-                    Enter discounts and credits as a positive amount — they are applied as reductions.
-                    A line in another currency is converted at this period's rate, and the invoice shows
-                    the original amount and rate beside it. Hosting and recurring lines are derived and
-                    cannot be added here; use an adjustment so the original figure stays on the record.
+                <p class="text-xs text-default-400 -mt-2 mb-3" id="lineAmountHint">
+                    Enter a quantity and rate for hourly or per-unit work and the amount is worked out for
+                    you; otherwise enter a flat amount. Discounts and credits go in as positive numbers —
+                    they are applied as reductions. Another currency is converted at this period's rate.
+                    Hosting and recurring lines are derived: use an adjustment so the original stays on
+                    the record.
                 </p>
                 <div class="border-t border-default-200 flex gap-2 justify-end pt-4 mt-4">
                     <button type="button" class="btn btn-light" data-hs-overlay="#lineOffcanvas">Cancel</button>
@@ -414,7 +427,31 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.getElementById('addLineBtn')?.addEventListener('click', () => {
         document.getElementById('lineForm').reset();
+        syncLineAmount();
         HSOverlay.open('#lineOffcanvas');
+    });
+
+    /**
+     * With a quantity and rate, the amount is derived — so show the result and
+     * stop it being edited, rather than letting the two disagree.
+     */
+    function syncLineAmount () {
+        const qty = document.querySelector('input[name="quantity"]');
+        const rate = document.querySelector('input[name="unit_rate"]');
+        const amount = document.querySelector('input[name="amount"]');
+        if (!qty || !rate || !amount) return;
+
+        const metered = qty.value !== '' && rate.value !== '';
+        amount.readOnly = metered;
+        amount.classList.toggle('bg-default-100', metered);
+
+        if (metered) {
+            amount.value = (parseFloat(qty.value) * parseFloat(rate.value)).toFixed(2);
+        }
+    }
+
+    ['quantity', 'unit_rate'].forEach((name) => {
+        document.querySelector(`input[name="${name}"]`)?.addEventListener('input', syncLineAmount);
     });
 
     document.getElementById('lineForm')?.addEventListener('submit', async (e) => {

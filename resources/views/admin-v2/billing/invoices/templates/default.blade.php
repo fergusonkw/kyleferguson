@@ -39,6 +39,10 @@
     $amountPaid = $invoice->amountPaid();
     $hasPayments = bccomp($amountPaid, '0.00', 2) === 1;
 
+    // Qty and Rate columns only earn their place when something uses them —
+    // two empty columns on a hosting-only invoice are just noise.
+    $showRateColumns = $invoice->topLevelLines->contains(fn ($line): bool => $line->isMetered());
+
     // Built here rather than inline so optional lines can be dropped without
     // leaving blank rows in the address block.
     $issuerLines = array_values(array_filter([
@@ -144,6 +148,8 @@
   table.line-items tbody td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
   table.line-items tbody tr:nth-child(even) { background: var(--panel); }
   table.line-items th.right, table.line-items td.right { text-align: right; }
+  /* Keep "3 sessions" on one line rather than breaking across the column. */
+  table.line-items td.right { white-space: nowrap; }
   table.line-items td .item-title { font-weight: 700; color: var(--ink); }
   table.line-items td .item-desc { font-size: 8.8pt; color: var(--mute); margin-top: 2px; }
   table.line-items td .item-desc span { display: inline-block; margin-right: 14px; }
@@ -298,8 +304,15 @@
     <table class="line-items">
       <thead>
         <tr>
-          <th style="width:74%">Description</th>
-          <th class="right" style="width:26%">Amount</th>
+          @if($showRateColumns)
+            <th style="width:48%">Description</th>
+            <th class="right" style="width:15%">Qty</th>
+            <th class="right" style="width:16%">Rate</th>
+            <th class="right" style="width:21%">Amount</th>
+          @else
+            <th style="width:74%">Description</th>
+            <th class="right" style="width:26%">Amount</th>
+          @endif
         </tr>
       </thead>
       <tbody>
@@ -320,12 +333,21 @@
               @if($line->conversionNote())
                 <div class="item-desc"><span>{{ $line->conversionNote() }}</span></div>
               @endif
+              {{-- Without the Qty/Rate columns, a metered line still shows its
+                   working inline rather than losing it. --}}
+              @if(! $showRateColumns && $line->rateNote())
+                <div class="item-desc"><span>{{ $line->rateNote() }}</span></div>
+              @endif
             </td>
+            @if($showRateColumns)
+              <td class="right">{{ $line->quantityLabel() ?? '—' }}</td>
+              <td class="right">{{ $line->unit_rate !== null ? $money($line->unit_rate) : '—' }}</td>
+            @endif
             <td class="right">{{ $money($line->amount) }}</td>
           </tr>
         @empty
           <tr>
-            <td colspan="2" style="text-align:center;color:var(--mute);">No billable items for this period.</td>
+            <td colspan="{{ $showRateColumns ? 4 : 2 }}" style="text-align:center;color:var(--mute);">No billable items for this period.</td>
           </tr>
         @endforelse
       </tbody>

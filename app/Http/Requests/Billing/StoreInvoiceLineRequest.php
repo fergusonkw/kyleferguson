@@ -32,7 +32,11 @@ final class StoreInvoiceLineRequest extends FormRequest
                     InvoiceLineType::operatorEditable(),
                 )),
             ],
-            'amount' => ['required', 'numeric'],
+            // Either a flat amount, or a quantity and rate to derive it from.
+            'amount' => ['nullable', 'numeric'],
+            'quantity' => ['nullable', 'numeric', 'gt:0'],
+            'unit' => ['nullable', 'string', 'max:32'],
+            'unit_rate' => ['nullable', 'numeric'],
 
             // A line may be incurred in a currency the client is not billed in;
             // it is converted at the invoice period's rate.
@@ -70,15 +74,56 @@ final class StoreInvoiceLineRequest extends FormRequest
             ->all();
     }
 
+    /**
+     * The line's amount in its own currency: quantity × rate when the line is
+     * metered, otherwise the flat amount entered.
+     */
+    public function resolvedAmount(): string
+    {
+        if ($this->isMetered()) {
+            return number_format(
+                (float) $this->input('quantity') * (float) $this->input('unit_rate'),
+                2,
+                '.',
+                '',
+            );
+        }
+
+        return (string) $this->input('amount');
+    }
+
+    public function isMetered(): bool
+    {
+        return $this->filled('quantity') && $this->filled('unit_rate');
+    }
+
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
             $type = InvoiceLineType::tryFrom((string) $this->input('line_type'));
-            $amount = (float) $this->input('amount');
 
             if ($type === null) {
                 return;
             }
+
+            // A quantity without a rate (or the reverse) cannot price anything,
+            // and is more likely a half-filled form than a deliberate choice.
+            if ($this->filled('quantity') !== $this->filled('unit_rate')) {
+                $validator->errors()->add(
+                    'unit_rate',
+                    'Enter both a quantity and a rate, or neither and a flat amount instead.',
+                );
+
+                return;
+            }
+
+            if (! $this->isMetered() && ! $this->filled('amount')) {
+                $validator->errors()->add('amount', 'Enter an amount, or a quantity and rate to work it out.');
+
+                return;
+            }
+
+            $amount = (float) $this->resolvedAmount();
 
             if ($amount === 0.0) {
                 $validator->errors()->add('amount', 'A line of zero changes nothing — enter an amount.');

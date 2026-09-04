@@ -208,7 +208,7 @@ final class InvoiceController extends Controller
         $validated = $request->validated();
 
         $type = InvoiceLineType::from($validated['line_type']);
-        $sourceAmount = (string) $validated['amount'];
+        $sourceAmount = $request->resolvedAmount();
         $sourceCurrency = mb_strtoupper($validated['currency'] ?? $invoice->issue_currency);
 
         // A one-off cost can be incurred in a currency the client is not billed
@@ -237,6 +237,12 @@ final class InvoiceController extends Controller
             'description' => $validated['description'] ?? null,
             'line_type' => $type,
             'amount' => $amount,
+
+            // Kept in the currency the work was priced in, so the line can show
+            // "12 hrs × $95.00 USD" beside its converted total.
+            'quantity' => $request->isMetered() ? $validated['quantity'] : null,
+            'unit' => $request->isMetered() ? ($validated['unit'] ?? null) : null,
+            'unit_rate' => $request->isMetered() ? $validated['unit_rate'] : null,
             'source_amount' => $converted ? $sourceAmount : null,
             'source_currency' => $converted ? $sourceCurrency : null,
             'fx_rate_applied' => $converted ? $rate : null,

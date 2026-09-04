@@ -17,6 +17,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $project_id
  * @property string $label
  * @property string|null $description
+ * @property string|null $quantity
+ * @property string|null $unit
+ * @property string|null $unit_rate
  * @property InvoiceLineType $line_type
  * @property string $amount
  * @property string|null $source_amount
@@ -48,6 +51,9 @@ final class InvoiceLine extends Model
         'project_id',
         'label',
         'description',
+        'quantity',
+        'unit',
+        'unit_rate',
         'line_type',
         'amount',
         'source_amount',
@@ -94,6 +100,40 @@ final class InvoiceLine extends Model
     }
 
     /**
+     * Whether this line is priced by quantity rather than as a flat figure.
+     */
+    public function isMetered(): bool
+    {
+        return $this->quantity !== null && $this->unit_rate !== null;
+    }
+
+    /**
+     * The quantity as a client reads it — "12 hrs", or just "12" with no unit.
+     * Trailing zeros go, so 12.00 reads as 12 while 1.50 keeps its half.
+     */
+    public function quantityLabel(): ?string
+    {
+        if ($this->quantity === null) {
+            return null;
+        }
+
+        $number = rtrim(rtrim((string) $this->quantity, '0'), '.');
+
+        return filled($this->unit) ? $number.' '.$this->unit : $number;
+    }
+
+    /**
+     * How the line total was arrived at — "12 hrs × $95.00". A figure a client
+     * can check is a figure they are less likely to query.
+     */
+    public function rateNote(): ?string
+    {
+        return $this->isMetered()
+            ? sprintf('%s × $%s', $this->quantityLabel(), number_format((float) $this->unit_rate, 2))
+            : null;
+    }
+
+    /**
      * Whether this line was incurred in a currency other than the one the
      * invoice is issued in, and so carries a conversion worth showing.
      */
@@ -129,6 +169,8 @@ final class InvoiceLine extends Model
         return [
             'line_type' => InvoiceLineType::class,
             'amount' => 'decimal:2',
+            'quantity' => 'decimal:2',
+            'unit_rate' => 'decimal:2',
             'source_amount' => 'decimal:2',
             'fx_rate_applied' => 'decimal:8',
             'cost_basis_usd' => 'decimal:4',
