@@ -17,14 +17,26 @@ This document captures the decisions that govern the automated billing system. T
 
 ## Cost ingestion
 
-- DO billing data is pulled daily.
-- Raw DO API payloads are stored verbatim alongside derived records, keyed by `(invoice_uuid, fetched_at)`.
-- Project / resource mappings are also synced daily.
-- Account-level charges that cannot be attributed to a project (support plans, account credits, etc.) are bucketed as **overhead** and not passed to clients. They appear on an internal reconciliation report so the gap between "DO billed me" and "I billed clients" is always visible.
+- Every cost provider is pulled on a schedule (daily where the provider has a usage/billing API).
+- Raw provider API payloads are stored verbatim alongside derived records, keyed by `(cost_provider_id, period, content_hash)`.
+- Where a provider exposes project / resource mappings (DigitalOcean), those are synced daily too.
+- Account-level charges that cannot be attributed to a project (support plans, account credits, etc.) are bucketed as **overhead** and not passed to clients. They appear on an internal reconciliation report so the gap between "the provider billed me" and "I billed clients" is always visible.
+
+### DigitalOcean — parked
+
+DO billing ingestion is **not built in v1**. Laravel Cloud is under consideration as the hosting platform; building a DO billing adapter now would be wasted if the systems move. The DO *resource* sync from Phase 1 remains in the codebase but its scheduled run is disabled. When the hosting decision is made, the chosen provider (DO or Laravel Cloud — both usage-based) is added as a billing adapter behind the same interface SMTP2GO uses.
+
+### SMTP2GO — per-client email accounts
+
+- A **separate SMTP2GO account exists per client.** Each account is one cost provider record, linked 1:1 to a client.
+- SMTP2GO exposes **no cost, invoice, or billing-amount API** — only usage (`/stats/email_cycle`: emails sent / remaining / plan allowance, cycle dates). Plans are flat monthly subscriptions.
+- The per-account monthly fee is therefore **operator-configured** (`monthly_fee`, `fee_currency` — USD today) on the cost provider, not synced. It is entered **all-in** (whatever SMTP2GO actually charges, including any tax they add); while the business is unregistered that tax is a cost input absorbed by markup, consistent with the DO tax treatment above. `/stats/email_cycle` is still pulled and stored each period as usage evidence and to drive an over-quota warning.
+- The fee is recognised once per calendar-month billing period at 1×. SMTP2GO's rolling cycle dates are stored for context only; they do not shift which period the charge lands in.
+- Because the account maps to a client, the SMTP2GO cost **is client-attributable** (not overhead). It attributes to one of that client's projects and takes that project's markup like any other cost. A synthetic "subscription" resource represents the account and is assigned to a project through the normal effective-dated `resource_assignments` mechanism; it auto-assigns when the client has exactly one active project.
 
 ## Currency
 
-- DO charges in USD. Client invoices are issued in the client's **billing currency**, configured per client and constrained to the set of currencies supported by the client's business.
+- Providers charge in their own currency (DO: USD; SMTP2GO: USD). The canonical cost basis is **USD** — every `cost_line_item` carries the provider's `source_amount`/`source_currency` plus a normalized `usd_amount`. Client invoices are issued in the client's **billing currency**, configured per client and constrained to the set of currencies supported by the client's business.
 - The system supports multiple invoice currencies (CAD primary, USD common). Each business declares its `default_currency` and `supported_currencies`.
 - FX rate: **Bank of Canada monthly average** for the billing month is the primary source for any pair needed. Pulled per pair (USD → CAD, USD → USD no-op, etc.) on demand.
 - The FX rate used (rate, source, period) is snapshotted onto the invoice so historical invoices remain reproducible even if a rate source is later replaced.
@@ -108,9 +120,9 @@ Rules:
 
 ## Security
 
-- DO API token is **read-only**, stored encrypted in the database (not in `.env`), rotated quarterly.
-- Token access is logged.
-- Only the owner-user has access to the billing UI; no client-facing surfaces touch DO data.
+- Provider API tokens/keys are **read-only** where the provider supports scoping (DO token; SMTP2GO key limited to stats endpoints), stored encrypted in the database (not in `.env`), rotated quarterly.
+- Token access and rotation are logged.
+- Only the owner-user has access to the billing UI; no client-facing surfaces touch provider data.
 
 ## Client lifecycle
 
@@ -129,11 +141,18 @@ Rules:
 
 The dashboard surfaces at minimum:
 
-- **Unattributed resources**: anything in the DO Default Project, or in a project not mapped to a client.
-- **Cost gap**: DO total billed this period vs. sum of client-attributed costs. Anything non-zero needs an explanation.
-- **Trailing 12-month revenue per business**: progress toward each business's $30K registration threshold.
-- **Pending drafts**: invoices awaiting approval, oldest first.
+- **Unattributed resources**: anything in a provider's default/holding project, in a project not mapped to a client, or a synthetic account resource (e.g. an SMTP2GO account) not yet assigned to a project.
+- **Cost gap**: provider-reported total billed this period vs. sum of client-attributed costs + overhead. Anything non-zero needs an explanation. Only meaningful once a provider with a cost API is connected — with SMTP2GO alone the "billed" figure is the operator-entered fee, so the gap is zero by construction and the tile shows `—`.
+- **Trailing 12-month revenue per business**: progress toward each business's $30K registration threshold. *(Phase 3 — needs invoices.)*
+- **Pending drafts**: invoices awaiting approval, oldest first. *(Phase 3.)*
 
 ## Provider abstraction
 
-While v1 only implements DigitalOcean, the data model treats DO as one **cost provider** among many. Cost providers are scoped to a business — each business has its own credentials per provider. Adding Forge, a registrar, Backblaze, etc. later should require new ingestion adapters but no schema migration. Provider identifiers, raw payloads, and currency are stored generically.
+The data model treats every provider as one **cost provider** among many. Cost providers are scoped to a business — each business has its own credentials per provider. A provider implements only the capabilities it has: resource sync, billing sync, credential validation. Adding Forge, a registrar, Backblaze, Laravel Cloud, etc. later requires a new adapter but no schema migration. Provider identifiers, raw payloads, and currency are stored generically.
+
+Two provider shapes are supported:
+
+- **Account-per-business** (DigitalOcean, Laravel Cloud) — `cost_providers.client_id` is null; costs attribute to projects via synced resources and their assignments; unattributable account charges are overhead.
+- **Account-per-client** (SMTP2GO) — `cost_providers.client_id` is set; a single synthetic resource represents the account and attributes the whole charge to the client's project.
+
+v1 implements **SMTP2GO** only. DigitalOcean resource sync exists from Phase 1 (scheduled run disabled); DigitalOcean/Laravel Cloud billing is deferred — see *Cost ingestion*.

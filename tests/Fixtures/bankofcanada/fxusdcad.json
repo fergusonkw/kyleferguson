@@ -1,0 +1,23 @@
+{
+  "groupDetail": {
+    "label": "Daily exchange rates",
+    "description": "Daily average exchange rates - published once each business day by 16:30 ET",
+    "link": "https://www.bankofcanada.ca/valet/groups/FX_RATES_DAILY"
+  },
+  "seriesDetail": {
+    "FXUSDCAD": {
+      "label": "USD/CAD",
+      "description": "US dollar to Canadian dollar daily exchange rate",
+      "dimension": {
+        "key": "d",
+        "name": "date"
+      }
+    }
+  },
+  "observations": [
+    { "d": "2026-08-04", "FXUSDCAD": { "v": "1.3600" } },
+    { "d": "2026-08-05", "FXUSDCAD": { "v": "1.3700" } },
+    { "d": "2026-08-06", "FXUSDCAD": { "v": "1.3800" } },
+    { "d": "2026-08-07", "FXUSDCAD": { "v": "1.3900" } }
+  ]
+}

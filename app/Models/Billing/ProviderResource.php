@@ -27,6 +27,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property-read Project|null $project
  * @property-read \Illuminate\Database\Eloquent\Collection<int, ResourceAssignment> $assignments
  * @property-read ResourceAssignment|null $currentAssignment
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, CostLineItem> $costLineItems
  *
  * @method static \Database\Factories\Billing\ProviderResourceFactory factory($count = null, $state = [])
  *
@@ -66,6 +67,12 @@ final class ProviderResource extends Model
     public function assignments(): HasMany
     {
         return $this->hasMany(ResourceAssignment::class);
+    }
+
+    /** @return HasMany<CostLineItem, $this> */
+    public function costLineItems(): HasMany
+    {
+        return $this->hasMany(CostLineItem::class);
     }
 
     /** @return HasOne<ResourceAssignment, $this> */

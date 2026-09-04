@@ -14,9 +14,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * @property int $id
  * @property int $business_id
+ * @property int|null $client_id
  * @property CostProviderSlug $slug
  * @property string $display_name
  * @property array<string, mixed> $credentials
+ * @property array<string, mixed>|null $config
  * @property bool $enabled
  * @property \Illuminate\Support\Carbon|null $last_synced_at
  * @property SyncStatus $last_sync_status
@@ -24,7 +26,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read Business $business
+ * @property-read Client|null $client
  * @property-read \Illuminate\Database\Eloquent\Collection<int, ProviderResource> $resources
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, ProviderBillingPayload> $billingPayloads
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, CostLineItem> $costLineItems
  *
  * @method static \Database\Factories\Billing\CostProviderFactory factory($count = null, $state = [])
  *
@@ -38,9 +43,11 @@ final class CostProvider extends Model
     /** @var list<string> */
     protected $fillable = [
         'business_id',
+        'client_id',
         'slug',
         'display_name',
         'credentials',
+        'config',
         'enabled',
         'last_synced_at',
         'last_sync_status',
@@ -58,10 +65,41 @@ final class CostProvider extends Model
         return $this->belongsTo(Business::class);
     }
 
+    /**
+     * The client this provider account belongs to, for account-per-client
+     * providers (SMTP2GO). Null for account-per-business providers.
+     *
+     * @return BelongsTo<Client, $this>
+     */
+    public function client(): BelongsTo
+    {
+        return $this->belongsTo(Client::class);
+    }
+
     /** @return HasMany<ProviderResource, $this> */
     public function resources(): HasMany
     {
         return $this->hasMany(ProviderResource::class);
+    }
+
+    /** @return HasMany<ProviderBillingPayload, $this> */
+    public function billingPayloads(): HasMany
+    {
+        return $this->hasMany(ProviderBillingPayload::class);
+    }
+
+    /** @return HasMany<CostLineItem, $this> */
+    public function costLineItems(): HasMany
+    {
+        return $this->hasMany(CostLineItem::class);
+    }
+
+    /**
+     * Read a provider-specific setting from the non-encrypted `config` blob.
+     */
+    public function config(string $key, mixed $default = null): mixed
+    {
+        return data_get($this->config, $key, $default);
     }
 
     public function markSyncRunning(): void
@@ -97,6 +135,7 @@ final class CostProvider extends Model
         return [
             'slug' => CostProviderSlug::class,
             'credentials' => 'encrypted:array',
+            'config' => 'array',
             'enabled' => 'boolean',
             'last_synced_at' => 'datetime',
             'last_sync_status' => SyncStatus::class,
