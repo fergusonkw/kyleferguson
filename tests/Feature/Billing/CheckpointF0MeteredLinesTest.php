@@ -288,6 +288,122 @@ final class CheckpointF0MeteredLinesTest extends TestCase
             ->assertSee('name="unit_rate"', false);
     }
 
+    public function test_a_line_can_be_corrected_without_retyping_it(): void
+    {
+        // Deleting and re-entering a line to fix one field is a poor trade,
+        // and a blank unit is exactly the sort of thing noticed afterwards.
+        $invoice = $this->draft();
+        $line = InvoiceLine::factory()->for($invoice)->ofType(InvoiceLineType::Manual)->create([
+            'label' => 'Consulting', 'quantity' => '22.00', 'unit' => null,
+            'unit_rate' => '25.00', 'amount' => '550.00',
+        ]);
+
+        $this->actingAs($this->createAdmin())
+            ->patchJson(route('admin.billing.invoices.lines.update', [$invoice, $line]), [
+                'label' => 'Consulting',
+                'line_type' => InvoiceLineType::Manual->value,
+                'quantity' => '22',
+                'unit' => 'hours',
+                'unit_rate' => '25.00',
+            ])
+            ->assertOk();
+
+        $fresh = $line->fresh();
+        $this->assertSame('hours', $fresh->unit);
+        $this->assertSame('22 hours × $25.00', $fresh->rateNote());
+        $this->assertSame('550.00', $invoice->fresh()->total);
+    }
+
+    public function test_editing_a_line_recalculates_the_invoice_total(): void
+    {
+        $invoice = $this->draft();
+        $line = InvoiceLine::factory()->for($invoice)->ofType(InvoiceLineType::Manual)
+            ->amount(550)->create(['label' => 'Consulting']);
+        $invoice->forceFill(['subtotal' => 550, 'total' => 550])->save();
+
+        $this->actingAs($this->createAdmin())
+            ->patchJson(route('admin.billing.invoices.lines.update', [$invoice, $line]), [
+                'label' => 'Consulting',
+                'line_type' => InvoiceLineType::Manual->value,
+                'quantity' => '30',
+                'unit' => 'hours',
+                'unit_rate' => '25.00',
+            ])
+            ->assertOk();
+
+        $this->assertSame('750.00', $invoice->fresh()->total);
+    }
+
+    public function test_a_derived_line_cannot_be_edited(): void
+    {
+        $invoice = $this->draft();
+        $line = InvoiceLine::factory()->for($invoice)->ofType(InvoiceLineType::Hosting)->amount(120)->create();
+
+        $this->actingAs($this->createAdmin())
+            ->patchJson(route('admin.billing.invoices.lines.update', [$invoice, $line]), [
+                'label' => 'Tampered',
+                'line_type' => InvoiceLineType::Manual->value,
+                'amount' => '1.00',
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('success', false);
+
+        $this->assertSame('Hosting', mb_substr($line->fresh()->line_type->label(), 0, 7));
+    }
+
+    public function test_a_line_cannot_be_edited_once_the_invoice_leaves_draft(): void
+    {
+        $invoice = $this->draft();
+        $line = InvoiceLine::factory()->for($invoice)->ofType(InvoiceLineType::Manual)->amount(100)->create();
+        $invoice->forceFill(['status' => \App\Enums\Billing\InvoiceStatus::Sent])->save();
+
+        $this->actingAs($this->createAdmin())
+            ->patchJson(route('admin.billing.invoices.lines.update', [$invoice->fresh(), $line]), [
+                'label' => 'Changed',
+                'line_type' => InvoiceLineType::Manual->value,
+                'amount' => '5.00',
+            ])
+            ->assertForbidden();
+    }
+
+    public function test_the_edit_payload_shows_what_was_typed_not_the_converted_figure(): void
+    {
+        $invoice = $this->draft();
+        $line = InvoiceLine::factory()->for($invoice)->ofType(InvoiceLineType::Manual)->create([
+            'label' => 'US consulting', 'amount' => '1375.00',
+            'source_amount' => '1000.00', 'source_currency' => 'USD', 'fx_rate_applied' => '1.375',
+        ]);
+
+        $this->actingAs($this->createAdmin())
+            ->getJson(route('admin.billing.invoices.lines.edit', [$invoice, $line]))
+            ->assertOk()
+            ->assertJsonPath('line.amount', '1000.00')
+            ->assertJsonPath('line.currency', 'USD');
+    }
+
+    public function test_a_line_from_another_invoice_is_refused(): void
+    {
+        $invoice = $this->draft();
+        $other = Invoice::factory()->for($this->business)->for($this->client)->forPeriod('2026-07')->create();
+        $line = InvoiceLine::factory()->for($other)->ofType(InvoiceLineType::Manual)->create();
+
+        $this->actingAs($this->createAdmin())
+            ->getJson(route('admin.billing.invoices.lines.edit', [$invoice, $line]))
+            ->assertNotFound();
+    }
+
+    public function test_the_unit_field_suggests_common_units(): void
+    {
+        $invoice = $this->draft();
+
+        $this->actingAs($this->createAdmin())
+            ->get(route('admin.billing.invoices.show', $invoice))
+            ->assertOk()
+            ->assertSee('id="unitOptions"', false)
+            ->assertSee('value="hours"', false)
+            ->assertSee('value="sessions"', false);
+    }
+
     private function draft(): Invoice
     {
         return Invoice::factory()->for($this->business)->for($this->client)

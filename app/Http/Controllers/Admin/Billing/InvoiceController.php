@@ -259,6 +259,90 @@ final class InvoiceController extends Controller
         ]);
     }
 
+    /**
+     * Correct a line already on a draft.
+     *
+     * Without this, fixing a typo — or a unit left blank — means deleting the
+     * line and retyping it, which is a poor trade for a one-character change.
+     */
+    public function updateLine(StoreInvoiceLineRequest $request, Invoice $invoice, InvoiceLine $line): JsonResponse
+    {
+        if ($line->invoice_id !== $invoice->id) {
+            return response()->json(['success' => false, 'message' => 'That line belongs to another invoice.'], 404);
+        }
+
+        if (! $line->line_type->isOperatorEditable()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Derived lines cannot be edited. Add an adjustment line instead so the trail is preserved.',
+            ], 422);
+        }
+
+        $validated = $request->validated();
+        $type = InvoiceLineType::from($validated['line_type']);
+        $sourceAmount = $request->resolvedAmount();
+        $sourceCurrency = mb_strtoupper($validated['currency'] ?? $invoice->issue_currency);
+
+        try {
+            $rate = $this->fxRates->rateFor($sourceCurrency, $invoice->issue_currency, $invoice->period);
+        } catch (Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+
+        $amount = number_format((float) $sourceAmount * $rate, 2, '.', '');
+
+        if ($type->isNegative()) {
+            $amount = '-'.ltrim($amount, '-');
+        }
+
+        $converted = $sourceCurrency !== $invoice->issue_currency;
+
+        $line->update([
+            'label' => $validated['label'],
+            'description' => $validated['description'] ?? null,
+            'line_type' => $type,
+            'amount' => $amount,
+            'quantity' => $request->isMetered() ? $validated['quantity'] : null,
+            'unit' => $request->isMetered() ? ($validated['unit'] ?? null) : null,
+            'unit_rate' => $request->isMetered() ? $validated['unit_rate'] : null,
+            'source_amount' => $converted ? $sourceAmount : null,
+            'source_currency' => $converted ? $sourceCurrency : null,
+            'fx_rate_applied' => $converted ? $rate : null,
+        ]);
+
+        $this->builder->recalculateTotals($invoice->fresh());
+
+        return response()->json(['success' => true, 'message' => 'Line updated.']);
+    }
+
+    /**
+     * The line's own values, for populating the edit form.
+     */
+    public function editLine(Invoice $invoice, InvoiceLine $line): JsonResponse
+    {
+        $this->authorize('view', $invoice);
+
+        if ($line->invoice_id !== $invoice->id) {
+            return response()->json(['success' => false, 'message' => 'That line belongs to another invoice.'], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'line' => [
+                'id' => $line->id,
+                'label' => $line->label,
+                'description' => $line->description,
+                'line_type' => $line->line_type->value,
+                'quantity' => $line->quantity,
+                'unit' => $line->unit,
+                'unit_rate' => $line->unit_rate,
+                // Show what was typed, not the converted figure.
+                'amount' => $line->source_amount ?? ltrim($line->amount, '-'),
+                'currency' => $line->source_currency ?? $invoice->issue_currency,
+            ],
+        ]);
+    }
+
     public function destroyLine(Invoice $invoice, InvoiceLine $line): JsonResponse
     {
         $this->authorize('update', $invoice);

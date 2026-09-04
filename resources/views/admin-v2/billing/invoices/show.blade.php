@@ -168,10 +168,16 @@
                                     <td class="text-center">
                                         @if($isDraft && $line->line_type->isOperatorEditable())
                                             @can('update', $invoice)
-                                                <button type="button" class="btn btn-sm btn-light delete-line"
-                                                        data-id="{{ $line->id }}" aria-label="Remove line" title="Remove line">
-                                                    <i data-lucide="trash-2" class="size-4"></i>
-                                                </button>
+                                                <div class="flex gap-1 justify-center">
+                                                    <button type="button" class="btn btn-sm btn-light edit-line"
+                                                            data-id="{{ $line->id }}" aria-label="Edit line" title="Edit line">
+                                                        <i data-lucide="pencil" class="size-4"></i>
+                                                    </button>
+                                                    <button type="button" class="btn btn-sm btn-light delete-line"
+                                                            data-id="{{ $line->id }}" aria-label="Remove line" title="Remove line">
+                                                        <i data-lucide="trash-2" class="size-4"></i>
+                                                    </button>
+                                                </div>
                                             @endcan
                                         @endif
                                     </td>
@@ -281,6 +287,7 @@
         <x-admin-v2.offcanvas canvasId="lineOffcanvas" title="Add Line" size="medium">
             <form id="lineForm">
                 @csrf
+                <input type="hidden" id="lineId" name="line_id">
                 <x-admin-v2.form.input name="label" label="Title" :required="true" placeholder="Consulting — August" />
                 <x-admin-v2.form.textarea name="description" label="Details" rows="4"
                                           placeholder="What this line covers. Shown to the client under the title — use it to break down a large figure." />
@@ -290,9 +297,17 @@
                      out from these, so the client can check the figure. --}}
                 <div class="grid grid-cols-3 gap-3">
                     <x-admin-v2.form.input name="quantity" type="number" step="0.01" min="0" label="Quantity" placeholder="12" />
-                    <x-admin-v2.form.input name="unit" label="Unit" placeholder="hrs" maxlength="32" />
+                    {{-- Free text, but with suggestions and a default: left blank
+                         a line reads "22 × $25.00", which tells a client less
+                         than "22 hours × $25.00". --}}
+                    <x-admin-v2.form.input name="unit" label="Unit" placeholder="hours" maxlength="32" list="unitOptions" />
                     <x-admin-v2.form.input name="unit_rate" type="number" step="0.01" label="Rate" placeholder="95.00" />
                 </div>
+                <datalist id="unitOptions">
+                    @foreach(['hours', 'days', 'weeks', 'months', 'sessions', 'units', 'items', 'licences'] as $unit)
+                        <option value="{{ $unit }}"></option>
+                    @endforeach
+                </datalist>
 
                 <div class="grid grid-cols-3 gap-3">
                     <div class="col-span-2">
@@ -311,7 +326,7 @@
                 <div class="border-t border-default-200 flex gap-2 justify-end pt-4 mt-4">
                     <button type="button" class="btn btn-light" data-hs-overlay="#lineOffcanvas">Cancel</button>
                     <button type="submit" class="btn btn-primary" id="lineSubmitBtn">
-                        <i data-lucide="check" class="size-4 me-1"></i><span class="btn-text">Add Line</span>
+                        <i data-lucide="check" class="size-4 me-1"></i><span class="btn-text">Save Line</span>
                     </button>
                 </div>
             </form>
@@ -427,8 +442,37 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.getElementById('addLineBtn')?.addEventListener('click', () => {
         document.getElementById('lineForm').reset();
+        document.getElementById('lineId').value = '';
+        document.getElementById('lineOffcanvasLabel').textContent = 'Add Line';
+        delete document.querySelector('input[name="unit"]').dataset.touched;
         syncLineAmount();
         HSOverlay.open('#lineOffcanvas');
+    });
+
+    document.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.edit-line');
+        if (!btn) return;
+
+        try {
+            const r = await fetch(`${base}/lines/${btn.dataset.id}/edit`, { headers: { 'Accept': 'application/json' } });
+            const data = await r.json();
+            if (!data.success) { Alert.error(data.message || 'Could not load the line.'); return; }
+
+            const form = document.getElementById('lineForm');
+            form.reset();
+
+            for (const [key, value] of Object.entries(data.line)) {
+                const field = form.querySelector(`[name="${key}"]`);
+                if (field) field.value = value ?? '';
+            }
+
+            document.getElementById('lineId').value = data.line.id;
+            document.getElementById('lineOffcanvasLabel').textContent = 'Edit Line';
+            // Whatever is loaded is the operator's own value, not a default.
+            document.querySelector('input[name="unit"]').dataset.touched = '1';
+            syncLineAmount();
+            HSOverlay.open('#lineOffcanvas');
+        } catch { Alert.error('Could not load the line.'); }
     });
 
     /**
@@ -438,8 +482,16 @@ document.addEventListener('DOMContentLoaded', function () {
     function syncLineAmount () {
         const qty = document.querySelector('input[name="quantity"]');
         const rate = document.querySelector('input[name="unit_rate"]');
+        const unit = document.querySelector('input[name="unit"]');
         const amount = document.querySelector('input[name="amount"]');
         if (!qty || !rate || !amount) return;
+
+        // Entering a quantity almost always means hours here, and a blank unit
+        // silently produces a vaguer line. Fill it in rather than leave the
+        // omission to be noticed on the finished invoice; it stays editable.
+        if (unit && qty.value !== '' && unit.value === '' && !unit.dataset.touched) {
+            unit.value = 'hours';
+        }
 
         const metered = qty.value !== '' && rate.value !== '';
         amount.readOnly = metered;
@@ -450,13 +502,26 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // Once the unit is edited by hand, stop filling it in.
+    document.querySelector('input[name="unit"]')?.addEventListener('input', function () {
+        this.dataset.touched = this.value === '' ? '' : '1';
+    });
+
     ['quantity', 'unit_rate'].forEach((name) => {
         document.querySelector(`input[name="${name}"]`)?.addEventListener('input', syncLineAmount);
     });
 
     document.getElementById('lineForm')?.addEventListener('submit', async (e) => {
         e.preventDefault();
-        report(await post(`${base}/lines`, new FormData(e.target)), 'Could not add the line.');
+
+        const id = document.getElementById('lineId').value;
+        const body = new FormData(e.target);
+        if (id) body.append('_method', 'PATCH');
+
+        report(
+            await post(id ? `${base}/lines/${id}` : `${base}/lines`, body),
+            id ? 'Could not update the line.' : 'Could not add the line.',
+        );
     });
 
     document.addEventListener('click', async (e) => {
