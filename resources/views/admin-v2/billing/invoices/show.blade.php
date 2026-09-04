@@ -118,6 +118,25 @@
                                         @if($line->conversionNote())
                                             <div class="text-xs text-default-400 mt-1">{{ $line->conversionNote() }}</div>
                                         @endif
+
+                                        {{-- Markup is invisible to the client by design, so the
+                                             operator needs to see it here or they are approving a
+                                             number they cannot check. --}}
+                                        @if($line->line_type === \App\Enums\Billing\InvoiceLineType::Hosting && filled($line->metadata['markup_summary'] ?? null))
+                                            @php($meta = $line->metadata)
+                                            <div class="text-xs mt-1.5 inline-flex flex-wrap items-center gap-1.5">
+                                                <span class="text-default-400">Cost {{ $money($meta['cost_in_issue_currency'] ?? 0) }}</span>
+                                                <i data-lucide="arrow-right" class="size-3 text-default-400"></i>
+                                                <span class="badge bg-info/15 text-info">{{ $meta['markup_summary'] }}</span>
+                                                <i data-lucide="arrow-right" class="size-3 text-default-400"></i>
+                                                <span class="text-default-500 font-medium">{{ $money($line->amount) }}</span>
+                                                @if(($meta['cost_in_issue_currency'] ?? null) !== null)
+                                                    <span class="text-default-400">
+                                                        (margin {{ $money(bcsub($line->amount, (string) $meta['cost_in_issue_currency'], 2)) }})
+                                                    </span>
+                                                @endif
+                                            </div>
+                                        @endif
                                     </td>
                                     <td><span class="badge bg-default">{{ $line->line_type->label() }}</span></td>
                                     <td class="text-end font-medium">{{ $money($line->amount) }}</td>

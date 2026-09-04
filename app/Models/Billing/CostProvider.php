@@ -17,6 +17,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $client_id
  * @property CostProviderSlug $slug
  * @property string $display_name
+ * @property string|null $invoice_label
+ * @property string|null $invoice_description
  * @property array<string, mixed> $credentials
  * @property array<string, mixed>|null $config
  * @property bool $enabled
@@ -46,6 +48,8 @@ final class CostProvider extends Model
         'client_id',
         'slug',
         'display_name',
+        'invoice_label',
+        'invoice_description',
         'credentials',
         'config',
         'enabled',
@@ -100,6 +104,20 @@ final class CostProvider extends Model
     public function config(string $key, mixed $default = null): mixed
     {
         return data_get($this->config, $key, $default);
+    }
+
+    /**
+     * What this provider's costs are called on a client invoice.
+     *
+     * Deliberately not `display_name` — that is the operator's name for the
+     * account ("SMTP2Go — Acme"), which is internal bookkeeping. The client
+     * reads the service they received.
+     */
+    public function invoiceLabel(): string
+    {
+        return filled($this->invoice_label)
+            ? $this->invoice_label
+            : $this->slug->defaultInvoiceLabel();
     }
 
     public function markSyncRunning(): void

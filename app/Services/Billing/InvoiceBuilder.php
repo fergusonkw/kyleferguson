@@ -153,7 +153,7 @@ final class InvoiceBuilder
             ->forPeriod($period)
             ->whereNotNull('project_id')
             ->whereHas('project', fn ($q) => $q->where('client_id', $client->id))
-            ->with('project')
+            ->with(['project', 'costProvider'])
             ->get()
             ->groupBy('project_id');
 
@@ -168,7 +168,8 @@ final class InvoiceBuilder
             $parent = InvoiceLine::create([
                 'invoice_id' => $invoice->id,
                 'project_id' => (int) $projectId,
-                'label' => 'Hosting — '.$project->name,
+                'label' => $this->serviceLabelFor($projectLines).' — '.$project->name,
+                'description' => $this->serviceDescriptionFor($projectLines),
                 'line_type' => InvoiceLineType::Hosting,
                 'amount' => $charged,
                 'cost_basis_usd' => $costUsd,
@@ -180,13 +181,55 @@ final class InvoiceBuilder
                     'markup_percent' => $project->effectiveMarkupValue(),
                     'markup_fee' => $project->effectiveMarkupFee(),
                     'cost_in_issue_currency' => $costInIssueCurrency,
+                    'markup_summary' => $project->effectiveMarkupType()->describe(
+                        $project->effectiveMarkupValue(),
+                        $project->effectiveMarkupFee(),
+                    ),
                 ],
             ]);
 
-            $order = $this->addCategorySubItems($parent, $projectLines, $rate, $order);
+            $order = $this->addCategorySubItems($parent, $projectLines, $charged, $order);
         }
 
         return $order;
+    }
+
+    /**
+     * Name the line after the services in it, not after "hosting".
+     *
+     * All of a project's provider costs stay on one line because markup is
+     * charged once per project — splitting per provider would apply a flat fee
+     * once each. So the label names every service contributing to it.
+     *
+     * @param  Collection<int, CostLineItem>  $projectLines
+     */
+    private function serviceLabelFor(Collection $projectLines): string
+    {
+        $labels = $projectLines
+            ->map(fn (CostLineItem $line): string => $line->costProvider->invoiceLabel())
+            ->unique()
+            ->sort()
+            ->values();
+
+        return $labels->count() <= 2
+            ? $labels->implode(' & ')
+            : 'Services';
+    }
+
+    /**
+     * A single provider's own description carries through to the line. With
+     * several, the sub-items already name each service, so an aggregate
+     * description would only repeat them.
+     *
+     * @param  Collection<int, CostLineItem>  $projectLines
+     */
+    private function serviceDescriptionFor(Collection $projectLines): ?string
+    {
+        $providers = $projectLines->map(fn (CostLineItem $line) => $line->costProvider)->unique('id');
+
+        return $providers->count() === 1
+            ? ($providers->first()->invoice_description ?: null)
+            : null;
     }
 
     /**
@@ -195,27 +238,107 @@ final class InvoiceBuilder
      *
      * @param  Collection<int, CostLineItem>  $projectLines
      */
-    private function addCategorySubItems(InvoiceLine $parent, Collection $projectLines, string $rate, int $order): int
-    {
-        $byCategory = $projectLines->groupBy(fn (CostLineItem $line): string => $line->category->value);
+    private function addCategorySubItems(
+        InvoiceLine $parent,
+        Collection $projectLines,
+        string $charged,
+        int $order,
+    ): int {
+        // Grouped by provider as well as category: "Compute" alone is ambiguous
+        // once a project draws on more than one service, and a client reading
+        // the breakdown needs to know which is which.
+        $multipleProviders = $projectLines->pluck('cost_provider_id')->unique()->count() > 1;
 
-        foreach ($byCategory as $categoryValue => $categoryLines) {
-            $category = CostCategory::from((string) $categoryValue);
+        $groups = $projectLines->groupBy(
+            fn (CostLineItem $line): string => $line->cost_provider_id.'|'.$line->category->value,
+        );
+
+        // Sub-items show each component's share of what is being charged, not
+        // its raw cost. Showing cost beside a marked-up parent would both fail
+        // to add up and let the client read the margin by subtraction.
+        $totalCostUsd = $this->sumCostBasis($projectLines);
+        $shares = $this->distribute($groups, $totalCostUsd, $charged);
+        $index = 0;
+
+        foreach ($groups as $groupLines) {
+            /** @var CostLineItem $first */
+            $first = $groupLines->first();
+            $category = CostCategory::from($first->category->value);
+
+            $label = $multipleProviders
+                ? $first->costProvider->invoiceLabel().' · '.$category->label()
+                : $category->label();
 
             InvoiceLine::create([
                 'invoice_id' => $parent->invoice_id,
                 'parent_id' => $parent->id,
                 'project_id' => $parent->project_id,
-                'label' => $category->label(),
+                'label' => $label,
                 'line_type' => InvoiceLineType::Hosting,
-                'amount' => $this->convert($this->sumCostBasis($categoryLines), $rate),
-                'cost_basis_usd' => $this->sumCostBasis($categoryLines),
+                'amount' => $shares[$index++],
+                'cost_basis_usd' => $this->sumCostBasis($groupLines),
                 'is_display_only' => true,
                 'display_order' => $order++,
             ]);
         }
 
         return $order;
+    }
+
+    /**
+     * Split the charged amount across groups in proportion to their cost.
+     *
+     * Rounding remainders go to the largest group, so the sub-items always sum
+     * to the parent exactly — a breakdown that does not add up is worse than
+     * no breakdown.
+     *
+     * @param  Collection<string, Collection<int, CostLineItem>>  $groups
+     * @return list<string>
+     */
+    private function distribute(Collection $groups, string $totalCostUsd, string $charged): array
+    {
+        $count = $groups->count();
+
+        if ($count === 0) {
+            return [];
+        }
+
+        if (bccomp($totalCostUsd, '0.0000', 4) !== 1) {
+            // No cost to weight by: split evenly and let the remainder land on
+            // the first group.
+            $even = bcdiv($charged, (string) $count, 2);
+            $shares = array_fill(0, $count, $even);
+            $shares[0] = bcadd($shares[0], bcsub($charged, bcmul($even, (string) $count, 2), 2), 2);
+
+            return $shares;
+        }
+
+        $shares = [];
+        $largestIndex = 0;
+        $largestCost = '0.0000';
+        $index = 0;
+
+        foreach ($groups as $groupLines) {
+            $groupCost = $this->sumCostBasis($groupLines);
+            $shares[] = number_format(
+                (float) bcdiv(bcmul($charged, $groupCost, 8), $totalCostUsd, 8),
+                2,
+                '.',
+                '',
+            );
+
+            if (bccomp($groupCost, $largestCost, 4) === 1) {
+                $largestCost = $groupCost;
+                $largestIndex = $index;
+            }
+
+            $index++;
+        }
+
+        $assigned = array_reduce($shares, fn (string $carry, string $s): string => bcadd($carry, $s, 2), '0.00');
+        $shares[$largestIndex] = bcadd($shares[$largestIndex], bcsub($charged, $assigned, 2), 2);
+
+        return $shares;
     }
 
     private function addRecurringLines(
