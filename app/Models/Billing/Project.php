@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $do_project_uuid
  * @property MarkupType|null $markup_type
  * @property string|null $markup_value
+ * @property string|null $markup_fee
  * @property ProjectStatus $status
  * @property \Illuminate\Support\Carbon|null $terminated_at
  * @property string|null $notes
@@ -43,6 +44,7 @@ final class Project extends Model
         'do_project_uuid',
         'markup_type',
         'markup_value',
+        'markup_fee',
         'status',
         'terminated_at',
         'notes',
@@ -81,11 +83,31 @@ final class Project extends Model
     }
 
     /**
-     * The markup value effective for this project (falls back to client default).
+     * The markup percent effective for this project (falls back to client default).
      */
     public function effectiveMarkupValue(): string
     {
         return $this->markup_value ?? $this->client->default_markup_value;
+    }
+
+    /**
+     * The flat markup fee effective for this project (falls back to client default).
+     */
+    public function effectiveMarkupFee(): string
+    {
+        return $this->markup_fee ?? $this->client->default_markup_fee;
+    }
+
+    /**
+     * Apply this project's effective markup to a cost in the issue currency.
+     */
+    public function applyMarkup(string $cost): string
+    {
+        return $this->effectiveMarkupType()->apply(
+            $cost,
+            $this->effectiveMarkupValue(),
+            $this->effectiveMarkupFee(),
+        );
     }
 
     /**
@@ -96,6 +118,7 @@ final class Project extends Model
         return [
             'markup_type' => MarkupType::class,
             'markup_value' => 'decimal:4',
+            'markup_fee' => 'decimal:4',
             'status' => ProjectStatus::class,
             'terminated_at' => 'datetime',
         ];

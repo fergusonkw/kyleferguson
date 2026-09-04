@@ -22,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property ClientStatus $status
  * @property MarkupType $default_markup_type
  * @property string $default_markup_value
+ * @property string $default_markup_fee
  * @property string|null $notes
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
@@ -50,6 +51,7 @@ final class Client extends Model
         'status',
         'default_markup_type',
         'default_markup_value',
+        'default_markup_fee',
         'notes',
     ];
 
@@ -86,6 +88,7 @@ final class Client extends Model
             'status' => ClientStatus::class,
             'default_markup_type' => MarkupType::class,
             'default_markup_value' => 'decimal:4',
+            'default_markup_fee' => 'decimal:4',
         ];
     }
 }
