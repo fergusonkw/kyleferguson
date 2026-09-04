@@ -29,6 +29,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $notification_email
  * @property string $daily_reminder_time
  * @property string|null $late_fee_terms
+ * @property int $payment_terms_days
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Client> $clients
@@ -63,6 +64,7 @@ final class Business extends Model
         'notification_email',
         'daily_reminder_time',
         'late_fee_terms',
+        'payment_terms_days',
     ];
 
     /** @return HasMany<Client, $this> */
