@@ -8,6 +8,8 @@ use App\Http\Controllers\Admin\Billing\BusinessController;
 use App\Http\Controllers\Admin\Billing\BusinessSwitcherController;
 use App\Http\Controllers\Admin\Billing\ClientController as BillingClientController;
 use App\Http\Controllers\Admin\Billing\CostProviderController;
+use App\Http\Controllers\Admin\Billing\InvoiceController;
+use App\Http\Controllers\Admin\Billing\PaymentController;
 use App\Http\Controllers\Admin\Billing\ProjectController as BillingProjectController;
 use App\Http\Controllers\Admin\Billing\ReconciliationController;
 use App\Http\Controllers\Admin\DashboardController;
@@ -146,6 +148,23 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'email.verified', '2
         Route::get('projects/{project}/edit', [BillingProjectController::class, 'edit'])->name('projects.edit');
         Route::put('projects/{project}', [BillingProjectController::class, 'update'])->name('projects.update');
         Route::delete('projects/{project}', [BillingProjectController::class, 'destroy'])->name('projects.destroy');
+
+        // Invoices
+        Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices.index');
+        Route::get('invoices/data', [InvoiceController::class, 'data'])->name('invoices.data');
+        Route::get('invoices/available-clients', [InvoiceController::class, 'availableClients'])->name('invoices.available-clients');
+        Route::post('invoices/generate', [InvoiceController::class, 'generate'])->name('invoices.generate');
+        Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
+        Route::get('invoices/{invoice}/preview', [InvoiceController::class, 'preview'])->name('invoices.preview');
+        Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'downloadPdf'])->name('invoices.pdf');
+        Route::post('invoices/{invoice}/regenerate', [InvoiceController::class, 'regenerate'])->name('invoices.regenerate');
+        Route::post('invoices/{invoice}/approve', [InvoiceController::class, 'approve'])->name('invoices.approve');
+        Route::post('invoices/{invoice}/sent', [InvoiceController::class, 'markSent'])->name('invoices.sent');
+        Route::post('invoices/{invoice}/void', [InvoiceController::class, 'void'])->name('invoices.void');
+        Route::post('invoices/{invoice}/lines', [InvoiceController::class, 'storeLine'])->name('invoices.lines.store');
+        Route::delete('invoices/{invoice}/lines/{line}', [InvoiceController::class, 'destroyLine'])->name('invoices.lines.destroy');
+        Route::post('invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('invoices.payments.store');
+        Route::delete('invoices/{invoice}/payments/{payment}', [PaymentController::class, 'destroy'])->name('invoices.payments.destroy');
 
         // Reconciliation
         Route::get('reconciliation', [ReconciliationController::class, 'index'])->name('reconciliation.index');

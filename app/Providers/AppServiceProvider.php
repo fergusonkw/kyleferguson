@@ -8,12 +8,14 @@ use App\Enums\Permission;
 use App\Models\Billing\Business;
 use App\Models\Billing\Client as BillingClient;
 use App\Models\Billing\CostProvider;
+use App\Models\Billing\Invoice;
 use App\Models\Billing\Project;
 use App\Models\Role;
 use App\Models\User;
 use App\Policies\Billing\BusinessPolicy;
 use App\Policies\Billing\ClientPolicy as BillingClientPolicy;
 use App\Policies\Billing\CostProviderPolicy;
+use App\Policies\Billing\InvoicePolicy;
 use App\Policies\Billing\ProjectPolicy;
 use App\Policies\RolePolicy;
 use App\Policies\UserPolicy;
@@ -43,6 +45,7 @@ final class AppServiceProvider extends ServiceProvider
         Gate::policy(BillingClient::class, BillingClientPolicy::class);
         Gate::policy(Project::class, ProjectPolicy::class);
         Gate::policy(CostProvider::class, CostProviderPolicy::class);
+        Gate::policy(Invoice::class, InvoicePolicy::class);
 
         // Permission-backed gates for resources without an Eloquent model.
         Gate::define('viewAny-audit-logs', fn (User $user) => $user->hasPermission(Permission::ViewAuditLogs->value));

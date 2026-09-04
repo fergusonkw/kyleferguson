@@ -28,6 +28,8 @@ enum Permission: string
     case ManageClients = 'billing.clients.manage';
     case ManageProjects = 'billing.projects.manage';
     case ManageCostProviders = 'billing.cost-providers.manage';
+    case ManageInvoices = 'billing.invoices.manage';
+    case ApproveInvoices = 'billing.invoices.approve';
 
     /**
      * All permission slugs.
@@ -48,7 +50,7 @@ enum Permission: string
             self::ViewUsers, self::CreateUsers, self::UpdateUsers, self::DeleteUsers => 'User Management',
             self::ViewRoles, self::ManageRoles => 'Role Management',
             self::ViewAuditLogs, self::ViewLogViewer, self::ViewQueueMonitor, self::ManageMaintenance => 'Operations',
-            self::ViewBilling, self::ManageBusinesses, self::ManageClients, self::ManageProjects, self::ManageCostProviders => 'Billing',
+            self::ViewBilling, self::ManageBusinesses, self::ManageClients, self::ManageProjects, self::ManageCostProviders, self::ManageInvoices, self::ApproveInvoices => 'Billing',
         };
     }
 
@@ -70,6 +72,8 @@ enum Permission: string
             self::ManageClients => 'Manage clients',
             self::ManageProjects => 'Manage projects',
             self::ManageCostProviders => 'Manage cost providers',
+            self::ManageInvoices => 'Generate & edit invoice drafts',
+            self::ApproveInvoices => 'Approve, send & void invoices',
         };
     }
 }

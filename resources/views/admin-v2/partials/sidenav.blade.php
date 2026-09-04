@@ -146,6 +146,15 @@
                     </li>
                     @endcan
 
+                    @can('viewAny', App\Models\Billing\Invoice::class)
+                    <li class="menu-item">
+                        <a href="{{ route('admin.billing.invoices.index') }}" class="menu-link">
+                            <span class="menu-icon"><i data-lucide="receipt"></i></span>
+                            <span class="menu-text">Invoices</span>
+                        </a>
+                    </li>
+                    @endcan
+
                     <li class="menu-item">
                         <a href="{{ route('admin.billing.reconciliation.index') }}" class="menu-link">
                             <span class="menu-icon"><i data-lucide="scale"></i></span>

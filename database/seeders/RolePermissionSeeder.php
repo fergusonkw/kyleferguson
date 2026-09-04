@@ -35,6 +35,8 @@ final class RolePermissionSeeder extends Seeder
                 PermissionEnum::ManageClients->value,
                 PermissionEnum::ManageProjects->value,
                 PermissionEnum::ManageCostProviders->value,
+                PermissionEnum::ManageInvoices->value,
+                PermissionEnum::ApproveInvoices->value,
             ],
             RoleEnum::User->slug() => [],
         ];
