@@ -75,9 +75,14 @@ final class ProjectController extends Controller
                 e($p->status->badgeColor()),
                 e($p->status->label()),
             ),
+            // A project with no markup of its own bills at the client's default,
+            // so say which one applies rather than just "inherits".
             'markup' => $p->markup_type
-                ? e($p->markup_type->label())
-                : '<em class="text-default-400">inherits</em>',
+                ? e($p->markup_type->describe($p->markup_value, $p->markup_fee))
+                : sprintf(
+                    '<em class="text-default-400">inherits %s</em>',
+                    e($p->client->default_markup_type->describe($p->client->default_markup_value, $p->client->default_markup_fee)),
+                ),
             'actions' => view('admin-v2.billing.projects.partials.actions', ['project' => $p])->render(),
         ]);
 
@@ -177,6 +182,7 @@ final class ProjectController extends Controller
                 'status' => $project->status->value,
                 'markup_type' => $project->markup_type?->value,
                 'markup_value' => $project->markup_value,
+                'markup_fee' => $project->markup_fee,
                 'notes' => $project->notes,
             ],
         ]);
@@ -188,7 +194,8 @@ final class ProjectController extends Controller
         $project->update($request->validated());
 
         $markupChanged = ($original['markup_type'] ?? null) !== ($project->markup_type?->value)
-            || (float) ($original['markup_value'] ?? 0) !== (float) ($project->markup_value ?? 0);
+            || (float) ($original['markup_value'] ?? 0) !== (float) ($project->markup_value ?? 0)
+            || (float) ($original['markup_fee'] ?? 0) !== (float) ($project->markup_fee ?? 0);
         $linkChanged = ($original['do_project_uuid'] ?? null) !== $project->do_project_uuid;
 
         $tags = ['billing', 'project'];

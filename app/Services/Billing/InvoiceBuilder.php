@@ -17,7 +17,6 @@ use App\Models\Billing\RecurringLineTemplate;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use RuntimeException;
 
 /**
  * Builds a draft invoice for one client and period.
@@ -87,7 +86,7 @@ final class InvoiceBuilder
 
             $order = 0;
             $order = $this->addHostingLines($invoice, $client, $period, $rate, $order);
-            $order = $this->addRecurringLines($invoice, $client, $currency, $periodStart, $periodEnd, $order);
+            $order = $this->addRecurringLines($invoice, $client, $currency, $period, $periodStart, $periodEnd, $order);
             $this->addCarriedCredits($invoice, $client, $period, $order);
 
             $this->recalculateTotals($invoice);
@@ -223,6 +222,7 @@ final class InvoiceBuilder
         Invoice $invoice,
         Client $client,
         string $currency,
+        string $period,
         Carbon $periodStart,
         Carbon $periodEnd,
         int $order,
@@ -238,24 +238,24 @@ final class InvoiceBuilder
                 continue;
             }
 
-            // A template priced in a currency the client is not billed in
-            // cannot be silently converted — the operator has to resolve it.
-            if (mb_strtoupper($template->currency) !== $currency) {
-                throw new RuntimeException(sprintf(
-                    'Recurring line "%s" is priced in %s but %s is billed in %s. Fix the template before generating this invoice.',
-                    $template->label,
-                    $template->currency,
-                    $client->name,
-                    $currency,
-                ));
-            }
+            // A recurring item can be priced in the currency it is actually
+            // bought in — a domain renewal billed in USD to a CAD client. It
+            // converts at the period's rate, the same as a manual line, and
+            // keeps what was charged so the invoice can show its working.
+            $templateCurrency = mb_strtoupper($template->currency);
+            $converted = $templateCurrency !== $currency;
+            $rate = $this->fxRates->rateFor($templateCurrency, $currency, $period);
+            $amount = number_format((float) $template->amount * $rate, 2, '.', '');
 
             InvoiceLine::create([
                 'invoice_id' => $invoice->id,
                 'project_id' => $template->project_id,
                 'label' => $template->label,
                 'line_type' => InvoiceLineType::Recurring,
-                'amount' => $template->amount,
+                'amount' => $amount,
+                'source_amount' => $converted ? $template->amount : null,
+                'source_currency' => $converted ? $templateCurrency : null,
+                'fx_rate_applied' => $converted ? $rate : null,
                 'source_reference' => "recurring_line_templates:{$template->id}",
                 'is_display_only' => false,
                 'display_order' => $order++,

@@ -115,11 +115,16 @@ final class CheckpointE4InvoiceUiTest extends TestCase
             ->assertJsonValidationErrors(['period']);
     }
 
-    public function test_a_recurring_currency_mismatch_surfaces_as_a_message_not_a_crash(): void
+    public function test_a_generation_failure_surfaces_as_a_message_not_a_crash(): void
     {
-        \App\Models\Billing\RecurringLineTemplate::factory()->for($this->client)
-            ->amount(19.00, 'USD')->window('2026-01-01')->create(['label' => 'Mispriced']);
+        Http::fake(['*/observations/*' => Http::response(['observations' => []])]);
+        FxRate::query()->delete();
 
+        \App\Models\Billing\RecurringLineTemplate::factory()->for($this->client)
+            ->amount(19.00, 'USD')->window('2026-01-01')->create(['label' => 'Domain renewal']);
+
+        // No rate is resolvable for USD→CAD, so the builder refuses rather
+        // than inventing one; the operator sees why.
         $this->actingAs($this->createAdmin())
             ->postJson(route('admin.billing.invoices.generate'), [
                 'client_id' => $this->client->id,

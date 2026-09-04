@@ -55,6 +55,24 @@ enum MarkupType: string
     }
 
     /**
+     * Human-readable summary of a configured markup, e.g. "15%", "$40.00",
+     * "$40.00 + 15%". Single source of truth so the list, the form hint and
+     * the invoice line metadata cannot describe the same markup differently.
+     */
+    public function describe(?string $percent, ?string $fee): string
+    {
+        $pct = rtrim(rtrim(number_format((float) ($percent ?? 0), 4, '.', ''), '0'), '.');
+        $amount = '$'.number_format((float) ($fee ?? 0), 2);
+
+        return match ($this) {
+            self::Passthrough => 'pass-through',
+            self::Percent => $pct.'%',
+            self::FixedFee => $amount,
+            self::Hybrid => $amount.' + '.$pct.'%',
+        };
+    }
+
+    /**
      * Whether the type charges a percentage of cost — drives which fields the
      * markup form shows.
      */

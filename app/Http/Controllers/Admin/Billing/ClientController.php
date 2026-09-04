@@ -71,7 +71,7 @@ final class ClientController extends Controller
                 e($c->status->badgeColor()),
                 e($c->status->label()),
             ),
-            'markup' => $this->renderMarkup($c->default_markup_type, $c->default_markup_value),
+            'markup' => e($c->default_markup_type->describe($c->default_markup_value, $c->default_markup_fee)),
             'actions' => view('admin-v2.billing.clients.partials.actions', ['client' => $c])->render(),
         ]);
 
@@ -112,6 +112,7 @@ final class ClientController extends Controller
                 'status' => $client->status->value,
                 'default_markup_type' => $client->default_markup_type->value,
                 'default_markup_value' => $client->default_markup_value,
+                'default_markup_fee' => $client->default_markup_fee,
                 'notes' => $client->notes,
                 'supported_currencies' => $client->business->supported_currencies ?? ['CAD'],
             ],
@@ -124,7 +125,8 @@ final class ClientController extends Controller
         $client->update($request->validated());
 
         $markupChanged = $original['default_markup_type'] !== $client->default_markup_type->value
-            || (float) $original['default_markup_value'] !== (float) $client->default_markup_value;
+            || (float) $original['default_markup_value'] !== (float) $client->default_markup_value
+            || (float) ($original['default_markup_fee'] ?? 0) !== (float) $client->default_markup_fee;
 
         $tags = ['billing', 'client'];
         if ($markupChanged) {
@@ -158,15 +160,5 @@ final class ClientController extends Controller
             'success' => true,
             'message' => 'Client deleted.',
         ]);
-    }
-
-    private function renderMarkup(MarkupType $type, ?string $value): string
-    {
-        return match ($type) {
-            MarkupType::Percent => e($value ?? '0').'%',
-            MarkupType::FixedFee => '$'.e($value ?? '0'),
-            MarkupType::Hybrid => '$'.e($value ?? '0').' + %',
-            MarkupType::Passthrough => '<em class="text-default-400">pass-through</em>',
-        };
     }
 }

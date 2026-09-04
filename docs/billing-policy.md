@@ -65,9 +65,11 @@ After registration (future state, not implemented in v1):
 ## Markup
 
 - Markup is configured **per project**, not per client.
-- A client-level default exists; new projects inherit it but can be overridden.
+- A client-level default exists; projects inherit it unless they override it. A project overrides type *and* values together — there is no partial inheritance.
 - Supported markup types: `percent`, `fixed_fee`, `hybrid` (fee + percent), `passthrough` (cost only).
-- Markup is applied to the CAD cost basis (which already includes DO's tax while unregistered).
+- Markup is expressed as two components: `markup_value` is always the **percent** and `markup_fee` is always the **flat fee**. A type uses one, both, or neither, and the form only shows the components its type uses.
+- Markup applies to the **cost basis in the client's billing currency** — provider costs are converted first, then marked up, so markup is charged on what the work cost in the currency the client is billed in. The basis already includes the provider's tax while the business is unregistered.
+- Markup applies to **hosting lines only**. Recurring and manual lines are entered at the price charged, so applying markup to them would double-count the operator's own pricing decision.
 
 ## Invoice composition
 
@@ -79,8 +81,10 @@ A draft invoice is composed of:
 
 Rules:
 
-- DO-derived numbers are **not editable**. Corrections happen via separate adjustment lines so the audit trail is preserved.
+- Provider-derived numbers are **not editable**. Corrections happen via separate adjustment lines so the audit trail is preserved.
 - Sub-items are display-only; markup applies to the parent total, not per sub-item.
+- Any line may carry a free-text **description**, rendered under its title. A four-figure line needs to explain itself before a client can approve it for payment.
+- **A line may be priced in a currency the client is not billed in** — a domain renewal bought in USD on a CAD invoice. Recurring templates and manual lines both convert at the invoice period's rate, and the line keeps the original amount, its currency, and the rate applied, so the document shows its working ("USD 18.00 at 1.375") rather than asserting a converted figure. A rate that cannot be resolved refuses the line rather than guessing.
 - The invoice carries: client, billing period, FX rate used, line items, subtotal, total, status, timestamps.
 
 ## Approval workflow

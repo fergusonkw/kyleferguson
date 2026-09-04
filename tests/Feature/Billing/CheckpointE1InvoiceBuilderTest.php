@@ -22,7 +22,6 @@ use App\Models\Billing\RecurringLineTemplate;
 use App\Services\Billing\InvoiceBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
-use RuntimeException;
 use Tests\TestCase;
 
 /**
@@ -239,15 +238,32 @@ final class CheckpointE1InvoiceBuilderTest extends TestCase
         $this->assertSame('0.00', $this->build()->total);
     }
 
-    public function test_a_template_in_the_wrong_currency_stops_generation(): void
+    public function test_a_template_in_another_currency_is_converted(): void
     {
         RecurringLineTemplate::factory()->for($this->client)
-            ->amount(19.00, 'USD')->window('2026-01-01')->create(['label' => 'Mispriced item']);
+            ->amount(20.00, 'USD')->window('2026-01-01')->create(['label' => 'Domain renewal']);
 
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('is priced in USD');
+        $invoice = $this->build();
+        $line = $invoice->lines->firstWhere('line_type', InvoiceLineType::Recurring);
 
-        $this->build();
+        // 20.00 USD at the period's 2.0 rate = 40.00 CAD
+        $this->assertSame('40.00', $line->amount);
+        $this->assertSame('20.00', $line->source_amount);
+        $this->assertSame('USD', $line->source_currency);
+        $this->assertSame('40.00', $invoice->total);
+        $this->assertSame('USD 20.00 at 2', $line->conversionNote());
+    }
+
+    public function test_a_template_in_the_invoices_own_currency_records_no_conversion(): void
+    {
+        RecurringLineTemplate::factory()->for($this->client)
+            ->amount(19.00, 'CAD')->window('2026-01-01')->create(['label' => 'Laravel Forge']);
+
+        $line = $this->build()->lines->firstWhere('line_type', InvoiceLineType::Recurring);
+
+        $this->assertSame('19.00', $line->amount);
+        $this->assertNull($line->source_currency);
+        $this->assertFalse($line->wasConverted());
     }
 
     public function test_an_overpayment_carries_forward_as_a_credit(): void
