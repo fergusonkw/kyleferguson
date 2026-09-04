@@ -38,4 +38,17 @@ enum CostProviderSlug: string
     {
         return $this === self::Smtp2go;
     }
+
+    /**
+     * Whether the provider independently reports what it billed for a period.
+     *
+     * Only these providers make a reconciliation cost gap meaningful: where the
+     * charge is an operator-entered flat fee (SMTP2GO), the "billed" figure and
+     * the ingested figure are the same number, so the gap is zero by
+     * construction and is reported as unavailable instead.
+     */
+    public function reportsAuthoritativeTotal(): bool
+    {
+        return $this === self::DigitalOcean;
+    }
 }

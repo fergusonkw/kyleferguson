@@ -6,7 +6,7 @@ namespace Tests\Feature\Billing;
 
 use App\Enums\Billing\SyncStatus;
 use App\Enums\Role as RoleEnum;
-use App\Jobs\Billing\SyncDigitalOceanProjectsJob;
+use App\Jobs\Billing\SyncProviderResourcesJob;
 use App\Models\Billing\Business;
 use App\Models\Billing\Client;
 use App\Models\Billing\CostProvider;
@@ -190,8 +190,8 @@ final class CheckpointC2CrudTest extends TestCase
             ->assertOk();
 
         Bus::assertDispatched(
-            SyncDigitalOceanProjectsJob::class,
-            fn (SyncDigitalOceanProjectsJob $job) => $job->costProviderId === $provider->id,
+            SyncProviderResourcesJob::class,
+            fn (SyncProviderResourcesJob $job) => $job->costProviderId === $provider->id,
         );
     }
 
@@ -205,7 +205,7 @@ final class CheckpointC2CrudTest extends TestCase
             ->postJson(route('admin.billing.cost-providers.sync', $provider))
             ->assertStatus(422);
 
-        Bus::assertNotDispatched(SyncDigitalOceanProjectsJob::class);
+        Bus::assertNotDispatched(SyncProviderResourcesJob::class);
     }
 
     public function test_cost_provider_data_endpoint_scopes_to_current_business(): void

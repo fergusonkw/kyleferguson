@@ -21,6 +21,20 @@ enum CostCategory: string
     case Other = 'other';
 
     /**
+     * Category values that are never passed through to a client, for use in
+     * queries that cannot call {@see self::isAttributable()} per row.
+     *
+     * @return list<string>
+     */
+    public static function nonAttributableValues(): array
+    {
+        return array_values(array_map(
+            static fn (self $case): string => $case->value,
+            array_filter(self::cases(), static fn (self $case): bool => ! $case->isAttributable()),
+        ));
+    }
+
+    /**
      * @return array<string, string>
      */
     public static function options(): array

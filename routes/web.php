@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\Billing\BusinessSwitcherController;
 use App\Http\Controllers\Admin\Billing\ClientController as BillingClientController;
 use App\Http\Controllers\Admin\Billing\CostProviderController;
 use App\Http\Controllers\Admin\Billing\ProjectController as BillingProjectController;
+use App\Http\Controllers\Admin\Billing\ReconciliationController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\LogViewerController;
 use App\Http\Controllers\Admin\MaintenanceController;
@@ -146,6 +147,10 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'email.verified', '2
         Route::put('projects/{project}', [BillingProjectController::class, 'update'])->name('projects.update');
         Route::delete('projects/{project}', [BillingProjectController::class, 'destroy'])->name('projects.destroy');
 
+        // Reconciliation
+        Route::get('reconciliation', [ReconciliationController::class, 'index'])->name('reconciliation.index');
+        Route::get('reconciliation/line-items', [ReconciliationController::class, 'lineItems'])->name('reconciliation.line-items');
+
         // Cost providers
         Route::get('cost-providers', [CostProviderController::class, 'index'])->name('cost-providers.index');
         Route::get('cost-providers/data', [CostProviderController::class, 'data'])->name('cost-providers.data');
@@ -153,6 +158,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'email.verified', '2
         Route::get('cost-providers/{costProvider}/edit', [CostProviderController::class, 'edit'])->name('cost-providers.edit');
         Route::put('cost-providers/{costProvider}', [CostProviderController::class, 'update'])->name('cost-providers.update');
         Route::delete('cost-providers/{costProvider}', [CostProviderController::class, 'destroy'])->name('cost-providers.destroy');
+        Route::get('cost-providers/available-clients', [CostProviderController::class, 'availableClients'])->name('cost-providers.available-clients');
         Route::post('cost-providers/{costProvider}/sync', [CostProviderController::class, 'sync'])->name('cost-providers.sync');
+        Route::post('cost-providers/{costProvider}/sync-billing', [CostProviderController::class, 'syncBilling'])->name('cost-providers.sync-billing');
     });
 });

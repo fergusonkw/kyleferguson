@@ -63,8 +63,12 @@ Companion to [`billing-policy.md`](billing-policy.md). The policy doc captures r
 ### Cross-provider
 
 - **`Contracts\ResourceSyncAdapter`** (`syncProjectsAndResources()`), **`Contracts\BillingSyncAdapter`** (`syncBilling(CostProvider, string $period): int`), **`Contracts\CredentialValidator`** (`validateCredentials()`) — the current single `CostProviderAdapter` interface is split into these three. A provider implements only what it supports (DO: resource + credential; SMTP2GO: billing + credential).
-- **`ProviderAdapterRegistry`** — resolves a `CostProviderSlug` to its adapter instances; unknown slug throws. Replaces the `if ($slug === DigitalOcean)` branches in `CostProviderController::sync()` and `routes/console.php`.
-- **`CostAttributor`** — for a `(business, period)`: sets each `cost_line_items.project_id` from the `resource_assignments` row covering the period end; account-level lines (`category` not attributable, e.g. `Overhead`) are never attributed; lines whose resource is unmapped stay `project_id = null` and are surfaced for reconciliation. Sets `attributed_at`. Idempotent.
+- **`ProviderAdapterRegistry`** — resolves a `CostProviderSlug` to its adapter instances; an unsupported capability throws `UnsupportedProviderCapability`. Replaces the `if ($slug === DigitalOcean)` branches in `CostProviderController` and `routes/console.php`. Its `supports*()` probes also drive which sync buttons a provider row renders.
+- **`BillingPeriod`** — periods are calendar months (`YYYY-MM`). `openPeriods()` returns the current month, plus the previous month for the first 5 days while a provider settles it; validation, start/end, and display labels live here too.
+- Credentials keep each provider's own vocabulary inside the encrypted blob (`token` for DigitalOcean, `api_key` for SMTP2GO) so adapters read what their API documents.
+- **`CostAttributor`** — for a `(business, period)`: sets each `cost_line_items.project_id` from the `resource_assignments` row covering the period end; account-level lines (`category` not attributable, e.g. `Overhead`) are never attributed; lines whose resource is unmapped stay `project_id = null` and are surfaced for reconciliation. Sets `attributed_at`. Idempotent — an unchanged attribution is not re-saved.
+
+  **First-assignment fallback.** A resource whose assignment history begins *after* the period was not yet tracked rather than moved, so its earliest assignment is used instead of leaving the cost permanently unattributed — this is what makes backfilling a period work. A resource that genuinely moved is still governed by the period-end rule, and one explicitly *unassigned* during the period is not back-filled.
 - **`FxRateService`** — `rateFor($from, $to, $period): float` for any pair needed (Bank of Canada Valet API monthly average as primary source). `USD→USD` = 1.0; `CAD→USD` by inversion; cross via CAD for exotic pairs. Caches in `fx_rates`. Missing data throws a typed `FxRateUnavailableException`.
 
 ### Invoicing
@@ -77,7 +81,7 @@ Companion to [`billing-policy.md`](billing-policy.md). The policy doc captures r
 
 ### Reporting & notifications
 
-- **`ReconciliationReporter`** — computes dashboard tiles: attributed cost by client/project, unattributed resources + cost, overhead, and a provider-reported-vs-attributed **cost gap**. The gap is only meaningful once a provider with a cost API is connected (DO / Laravel Cloud); with only SMTP2GO connected it renders as `—` (SMTP2GO's "billed" figure is the operator-entered fee, so the gap is zero by construction). Trailing-12mo revenue and pending-drafts tiles arrive in Phase 3 (they need `invoices`).
+- **`ReconciliationReporter`** — computes dashboard tiles: attributed cost by client/project, unattributed resources + cost, overhead, and a provider-reported-vs-attributed **cost gap**. Gap computation is gated on `CostProviderSlug::reportsAuthoritativeTotal()` — true only for providers that independently report what they billed. With only SMTP2GO connected, both the reported total and the gap are `null` and the UI renders `—`, rather than a zero that would look like a clean reconciliation. Also exposes `trailingCost()`, a per-period cost series standing in for the trailing-12-month revenue gauge until invoices exist (Phase 3), alongside the pending-drafts tile.
 - **`OperatorNotifier`** — emits the `InvoiceReadyForReview`, `InvoiceGenerationNeedsAttention`, and `DraftReminderDigest` mailables. *(Phase 3.)*
 - **`RestatementDetector`** — diffs fresh provider payloads vs. stored; queues adjustment lines onto the next open draft for affected clients. *(Phase 4; relevant once a usage-based provider is connected.)*
 
@@ -90,7 +94,7 @@ All jobs implement `ShouldQueue` and are idempotent. Scheduled in `routes/consol
 | `SyncProviderResourcesJob` | **Paused** (was daily 02:00) | Generalized rename of `SyncDigitalOceanProjectsJob`; routes via `ProviderAdapterRegistry`. Schedule entry commented out while DO is parked — re-enable when a resource-sync provider is active. |
 | `SyncProviderBillingJob` | Daily 03:00, for current + previous period | Routes to the provider's `BillingSyncAdapter`; stores payloads, derives `cost_line_items` |
 | `AttributeCostsJob` | Daily 03:45, per business | Runs `CostAttributor` for the open periods |
-| `FetchFxRateJob` | 1st of month 01:00 (+ on demand) | Bank of Canada monthly average for pairs in use |
+| `FetchFxRateJob` | 1st of month 01:00, one job per non-USD currency clients actually bill in | Warms the Bank of Canada monthly average for the closed month so invoice generation is not the first thing to discover a rate is missing |
 | `ReconciliationAlertJob` | Daily 08:00, per business | `Mail\Billing\ReconciliationAlert` to the operator when unattributed resources exist or the cost gap is non-zero |
 
 Phase 3 adds `GenerateMonthlyDraftsJob` and `DraftReminderDigestJob`. Failure handling for those (detect "expected artifact did not appear" → `InvoiceGenerationNeedsAttention`) lands with Phase 3.
@@ -172,7 +176,7 @@ Scope was refocused after Phase 1: DigitalOcean billing ingestion is **parked** 
 - Jobs: `SyncProviderBillingJob`, `AttributeCostsJob`, `FetchFxRateJob`, `ReconciliationAlertJob`; rename `SyncDigitalOceanProjectsJob` → `SyncProviderResourcesJob` (registry-routed) and **comment out its schedule entry** while DO is parked
 - `Mail\Billing\ReconciliationAlert` (operator-facing)
 - Admin UI: SMTP2GO fields on the cost-provider form; `/admin/billing/reconciliation` page; replace the placeholder card on `/admin/billing` with live cost tiles wired through `CurrentBusiness` + `ReconciliationReporter`
-- Tests: `CheckpointD1Smtp2goTest`, `D2FxTest`, `D3AttributionTest`, `D4ReconciliationTest`, `D5RegistryTest`
+- Tests: `CheckpointD0SchemaTest`, `D1Smtp2goTest`, `D2FxTest`, `D3AttributionTest`, `D4ReconciliationTest`, `D5RegistryTest`, `D6JobsTest`, `D7AdminUiTest`
 
 **SMTP2GO attribution:** one `cost_providers` row per SMTP2GO account, `client_id` set to that client. `Smtp2go\BillingSync` creates one synthetic `provider_resources` row (`resource_type = 'subscription'`) and auto-seeds its `resource_assignments` row to the client's sole active project. If the client has 0 or >1 active projects the resource stays unattributed and is surfaced in the existing unattributed-resources view for a one-time manual assignment. All attribution continues to flow through `resource_assignments` — no parallel path. The monthly fee is USD (`config.fee_currency = 'USD'`), so FX is a no-op for SMTP2GO today but built generically for CAD-billed clients downstream.
 
