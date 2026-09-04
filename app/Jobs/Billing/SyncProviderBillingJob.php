@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Jobs\Billing;
 
+use App\Exceptions\Billing\ProviderConfigurationException;
+use App\Exceptions\Billing\ProviderRejectedRequest;
 use App\Models\Billing\CostProvider;
 use App\Services\Billing\BillingPeriod;
 use App\Services\Billing\ProviderAdapterRegistry;
@@ -71,7 +73,24 @@ final class SyncProviderBillingJob implements ShouldQueue
             return;
         }
 
-        $written = $registry->billingSyncFor($provider->slug)->syncBilling($provider, $this->period);
+        try {
+            $written = $registry->billingSyncFor($provider->slug)->syncBilling($provider, $this->period);
+        } catch (ProviderRejectedRequest|ProviderConfigurationException $e) {
+            // Neither a bad credential nor missing config gets better by trying
+            // again. Retrying would only bury the provider's own explanation
+            // under a MaxAttemptsExceededException by the time it lands in
+            // failed_jobs, which is exactly the message an operator needs.
+            Log::error('SyncProviderBillingJob: provider refused, not retrying', [
+                'cost_provider_id' => $provider->id,
+                'slug' => $provider->slug->value,
+                'period' => $this->period,
+                'reason' => $e->getMessage(),
+            ]);
+
+            $this->fail($e);
+
+            return;
+        }
 
         Log::info('SyncProviderBillingJob: completed', [
             'cost_provider_id' => $provider->id,
