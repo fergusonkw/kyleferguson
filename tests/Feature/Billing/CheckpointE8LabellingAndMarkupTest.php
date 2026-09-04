@@ -147,6 +147,50 @@ final class CheckpointE8LabellingAndMarkupTest extends TestCase
         $this->assertEqualsCanonicalizing(['Compute', 'Database'], $children->pluck('label')->all());
     }
 
+    public function test_a_lone_component_gets_no_breakdown(): void
+    {
+        // One sub-item breaks nothing down — it restates the parent's figure
+        // directly underneath it, which reads as a duplicate charge.
+        $this->cost($this->smtp2go(), 30.00, CostCategory::Email);
+
+        $parent = $this->build()->topLevelLines()->firstOrFail();
+
+        $this->assertSame('33.00', $parent->amount);
+        $this->assertCount(0, $parent->children);
+    }
+
+    public function test_sub_items_share_out_the_charged_amount_not_the_raw_cost(): void
+    {
+        $provider = $this->digitalOcean();
+        $this->cost($provider, 60.00, CostCategory::Compute);
+        $this->cost($provider, 40.00, CostCategory::Database);
+
+        $parent = $this->build()->topLevelLines()->firstOrFail();
+        $children = $parent->children;
+
+        // 100 cost + 10% = 110 charged, split 60/40 by cost.
+        $this->assertSame('110.00', $parent->amount);
+        $this->assertSame('66.00', $children->firstWhere('label', 'Compute')->amount);
+        $this->assertSame('44.00', $children->firstWhere('label', 'Database')->amount);
+
+        $summed = $children->reduce(fn (string $c, $l): string => bcadd($c, $l->amount, 2), '0.00');
+        $this->assertSame($parent->amount, $summed);
+    }
+
+    public function test_sub_item_rounding_remainders_keep_the_breakdown_exact(): void
+    {
+        $provider = $this->digitalOcean();
+        // Thirds do not divide cleanly into cents.
+        $this->cost($provider, 10.00, CostCategory::Compute);
+        $this->cost($provider, 10.00, CostCategory::Database);
+        $this->cost($provider, 10.00, CostCategory::Storage);
+
+        $parent = $this->build()->topLevelLines()->firstOrFail();
+
+        $summed = $parent->children->reduce(fn (string $c, $l): string => bcadd($c, $l->amount, 2), '0.00');
+        $this->assertSame($parent->amount, $summed);
+    }
+
     public function test_markup_is_still_charged_once_for_a_project_using_two_services(): void
     {
         // A flat fee split across providers would be charged once each, so the

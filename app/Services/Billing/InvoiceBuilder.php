@@ -253,6 +253,12 @@ final class InvoiceBuilder
             fn (CostLineItem $line): string => $line->cost_provider_id.'|'.$line->category->value,
         );
 
+        // A single sub-item breaks nothing down — it just restates the parent's
+        // figure underneath itself, which reads like a duplicate charge.
+        if ($groups->count() < 2) {
+            return $order;
+        }
+
         // Sub-items show each component's share of what is being charged, not
         // its raw cost. Showing cost beside a marked-up parent would both fail
         // to add up and let the client read the margin by subtraction.
