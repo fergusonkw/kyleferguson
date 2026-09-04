@@ -28,12 +28,19 @@ final class InvoicePdfRenderer
 
     /**
      * Render the invoice to HTML using its snapshotted template.
+     *
+     * `$extra` carries anything only one surface needs — the hosted page's
+     * payment banner and download link. The PDF passes none, so the printed
+     * document stays the canonical record while the web page can add what only
+     * a web page can offer. One render either way, so the two cannot drift.
+     *
+     * @param  array<string, mixed>  $extra
      */
-    public function html(Invoice $invoice): string
+    public function html(Invoice $invoice, array $extra = []): string
     {
-        return $this->views->make($this->templateFor($invoice), [
+        return $this->views->make($this->templateFor($invoice), array_merge([
             'invoice' => $invoice->loadMissing(['topLevelLines.children', 'business', 'client', 'payments']),
-        ])->render();
+        ], $extra))->render();
     }
 
     /**

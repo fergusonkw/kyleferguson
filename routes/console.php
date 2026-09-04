@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use App\Jobs\Billing\AttributeCostsJob;
+use App\Jobs\Billing\DraftReminderDigestJob;
 use App\Jobs\Billing\FetchFxRateJob;
+use App\Jobs\Billing\GenerateMonthlyDraftsJob;
 use App\Jobs\Billing\ReconciliationAlertJob;
 use App\Jobs\Billing\SyncProviderBillingJob;
 use App\Jobs\QueueHeartbeat;
@@ -88,6 +90,30 @@ Schedule::call(function (): void {
         ->reject(fn (string $currency): bool => mb_strtoupper($currency) === 'USD')
         ->each(fn (string $currency) => FetchFxRateJob::dispatch('USD', mb_strtoupper($currency), $period));
 })->monthlyOn(1, '01:00')->name('billing:fetch-fx-rates')->withoutOverlapping();
+
+// Build the closed month's drafts once cost ingestion, attribution and FX
+// have all had their run. Nothing reaches a client without approval.
+Schedule::call(function (): void {
+    $period = BillingPeriod::previous();
+
+    Business::query()->each(function (Business $business) use ($period): void {
+        GenerateMonthlyDraftsJob::dispatch($business->id, $period);
+    });
+})->monthlyOn(1, '06:00')->name('billing:generate-monthly-drafts')->withoutOverlapping();
+
+// Chase drafts that have sat unapproved for more than a day. Each business is
+// nudged at the hour it chose.
+Schedule::call(function (): void {
+    $hourNow = now()->format('H');
+
+    Business::query()->each(function (Business $business) use ($hourNow): void {
+        // Stored as a `time` string ("08:00:00"); only the hour is compared,
+        // since this check itself only runs on the hour.
+        if (mb_substr((string) $business->daily_reminder_time, 0, 2) === $hourNow) {
+            DraftReminderDigestJob::dispatch($business->id);
+        }
+    });
+})->hourlyAt(0)->name('billing:draft-reminders')->withoutOverlapping();
 
 // Alert the operator about anything that could not be accounted for. Silent
 // when a period reconciles cleanly.

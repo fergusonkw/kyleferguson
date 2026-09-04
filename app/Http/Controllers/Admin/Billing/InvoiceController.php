@@ -10,6 +10,7 @@ use App\Enums\Billing\PaymentMethod;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Billing\GenerateInvoiceRequest;
 use App\Http\Requests\Billing\StoreInvoiceLineRequest;
+use App\Mail\Billing\ClientInvoiceMail;
 use App\Models\Billing\Client;
 use App\Models\Billing\Invoice;
 use App\Models\Billing\InvoiceLine;
@@ -21,6 +22,7 @@ use App\Services\Billing\InvoiceBuilder;
 use App\Services\Billing\InvoicePdfRenderer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
@@ -149,11 +151,28 @@ final class InvoiceController extends Controller
         )->invoice_number.' approved.');
     }
 
+    /**
+     * Email the invoice to the client and record that it went.
+     *
+     * The status only moves after the mail is handed off, so `sent_at` means
+     * "the client has it", not "we meant to send it".
+     */
     public function markSent(Invoice $invoice): JsonResponse
     {
         $this->authorize('send', $invoice);
 
-        return $this->attempt(fn (): string => $this->approver->markSent($invoice)->invoice_number.' marked as sent.');
+        return $this->attempt(function () use ($invoice): string {
+            $this->approver->assertCanTransitionTo($invoice, InvoiceStatus::Sent);
+
+            $recipient = $invoice->client_snapshot['contact_email']
+                ?? $invoice->client->contact_email;
+
+            Mail::to($recipient)->send(new ClientInvoiceMail($invoice));
+
+            $this->approver->markSent($invoice);
+
+            return "{$invoice->invoice_number} emailed to {$recipient}.";
+        });
     }
 
     public function void(Request $request, Invoice $invoice): JsonResponse

@@ -12,6 +12,12 @@
     the name in use is snapshotted onto the invoice at generation time.
 --}}
 @php
+    // Only the hosted client page supplies these; the PDF renders without
+    // them, so the printed document stays the canonical record.
+    $banner ??= null;
+    $downloadUrl ??= null;
+    $hosted = $banner !== null || $downloadUrl !== null;
+
     $business = $invoice->business_snapshot ?? [];
     $client = $invoice->client_snapshot ?? [];
     $currency = $invoice->issue_currency;
@@ -49,6 +55,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+@if($hosted)
+  <meta name="robots" content="noindex, nofollow">
+@endif
 <title>{{ $invoice->invoice_number }} — {{ $business['name'] ?? 'Invoice' }}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -185,8 +195,27 @@
     text-transform: uppercase; border: 1px solid var(--accent); color: var(--accent);
   }
 
+  /* Hosted client page only — never printed. */
+  .client-bar {
+    max-width: var(--page-width); margin: 32px auto -16px;
+    display: flex; flex-wrap: wrap; gap: 12px;
+    align-items: center; justify-content: space-between;
+  }
+  .client-bar .status {
+    flex: 1 1 320px; padding: 12px 16px; font-size: 10pt; line-height: 1.5;
+    border-left: 3px solid;
+  }
+  .client-bar .status.paid { background: #e8f5ed; border-color: #1e7c47; color: #14532d; }
+  .client-bar .status.partial { background: #fdf4e6; border-color: #b26b00; color: #7a4a00; }
+  .client-bar .status.overdue { background: var(--accent-soft); border-color: var(--accent); color: #7f231a; }
+  .client-bar .download {
+    display: inline-block; padding: 11px 20px; background: var(--charcoal); color: #fff;
+    text-decoration: none; font-size: 10pt; font-weight: 600;
+  }
+
   @media print {
     body { background: none; }
+    .client-bar { display: none; }
     @page { size: Letter; margin: 14mm; }
     @page :first { margin-top: 0; }
     .page { margin: 0; max-width: none; box-shadow: none; }
@@ -198,6 +227,19 @@
 </style>
 </head>
 <body>
+
+@if($hosted)
+  <div class="client-bar">
+    @if($banner !== null)
+      <div class="status {{ $banner['tone'] }}">{{ $banner['message'] }}</div>
+    @else
+      <div style="flex: 1 1 320px;"></div>
+    @endif
+    @if($downloadUrl !== null)
+      <a class="download" href="{{ $downloadUrl }}">Download PDF</a>
+    @endif
+  </div>
+@endif
 
 <div class="page">
 

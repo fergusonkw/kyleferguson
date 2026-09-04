@@ -23,6 +23,7 @@ use App\Http\Controllers\Admin\UserSettingsController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\TwoFactorChallengeController;
+use App\Http\Controllers\HostedInvoiceController;
 use Illuminate\Support\Facades\Route;
 
 // The marketing site lives as static files in public/index.html. Apache
@@ -32,6 +33,16 @@ use Illuminate\Support\Facades\Route;
 Route::post('/contact', [App\Http\Controllers\ContactController::class, 'submit'])
     ->middleware('throttle:contact')
     ->name('contact.submit');
+
+// Client-facing invoice, reached by the unguessable token in the emailed link.
+// No login: asking a client to create an account to read an invoice is a good
+// way not to get paid. Throttled so the token space cannot be probed.
+Route::middleware('throttle:30,1')->group(function (): void {
+    Route::get('/invoices/{token}', [HostedInvoiceController::class, 'show'])
+        ->name('invoices.hosted.show');
+    Route::get('/invoices/{token}/pdf', [HostedInvoiceController::class, 'pdf'])
+        ->name('invoices.hosted.pdf');
+});
 
 // Guest authentication
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
