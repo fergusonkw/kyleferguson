@@ -182,20 +182,30 @@ Scope was refocused after Phase 1: DigitalOcean billing ingestion is **parked** 
 
 **Output:** Dashboard shows attributed SMTP2GO costs per client/project, surfaces unattributed accounts, no invoices yet. DO / Laravel Cloud billing drops in later as another `BillingSyncAdapter`.
 
-### Phase 3 — Invoice engine + payments
+### Phase 3 — Invoice engine + payments *(built)*
 
 - `invoices`, `invoice_lines`, `recurring_line_templates`, `payments` tables
 - `InvoiceBuilder`, `InvoiceApprover`, `InvoicePdfRenderer`, `PaymentRecorder`, `InvoiceNumberAllocator`
 - `GenerateMonthlyDraftsJob`, `DraftReminderDigestJob`
 - All four mailables (`InvoiceReadyForReview`, `InvoiceGenerationNeedsAttention`, `DraftReminderDigest`, `ClientInvoiceMail`)
-- Per-business invoice templates (existing `templates/invoice.html` becomes the default) with logo and brand colors
-- Per-business client email templates (Blade Mailables) sharing the same branding
-- Multi-currency support: invoice issued in client's `billing_currency`; FX from USD cost basis pulled per pair as needed
-- Late-fee terms rendered in invoice footer (free-text field on business, snapshotted onto invoice at generation)
-- Hosted invoice view (signed URL) with payment banner
+- Per-business invoice templates (`templates/invoice.html` ported to `admin-v2.billing.invoices.templates.default`) with brand colours
+- Per-business client email templates sharing the same branding
+- Multi-currency: invoice issued in the client's `billing_currency`; hosting costs converted from the USD basis, and **individual recurring or manual lines may be priced in another currency** and converted at the period's rate, keeping the source amount and rate for display
+- Late-fee terms and cheque payee snapshotted onto the invoice and rendered
+- Hosted invoice view with payment banner
 - Admin UI: invoice list/detail, edit manual lines, approve, send, record payment
 
 **Output:** End-to-end automated drafts → operator notifications → review → approve → send → track payments.
+
+Decisions taken during the build that departed from the original sketch:
+
+- **PDF rendering is Browsershot**, not a PHP renderer. `templates/invoice.html` is a print-optimised design using flexbox and grid; dompdf would have meant rewriting it as tables. Hosts therefore need Node plus the Puppeteer Chromium download, or `LARAVEL_PDF_CHROME_PATH` pointed at a system Chrome.
+- **The hosted view is an unguessable token URL, not a Laravel signed URL.** A signed URL expires, which would break the link in an email the client keeps — and the durable, revocable thing is the token, which the schema already carried.
+- **The hosted page and the PDF are one render.** `InvoicePdfRenderer::html()` takes optional extra data; the hosted page passes a payment banner and download link, the PDF passes none. Two templates would have been free to drift.
+- **Markup is two components.** `markup_value` is always the percent and `markup_fee` always the flat fee, because `hybrid` needs both and Phase 1 gave markup a single column.
+- **Payment status is derived, never chosen.** `InvoiceStatus::allowedTransitions()` covers only operator moves; `isPaymentTracked()` governs payment-derived movement, so nothing can be marked paid without a payment record.
+
+Still open from this phase: **fonts are fetched from Google Fonts at render time**, matching the original template, so a PDF generated offline falls back to system fonts. Self-hosting Archivo and Space Mono would make invoices render identically indefinitely.
 
 ### Phase 4 — Polish
 
