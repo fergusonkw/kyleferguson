@@ -33,6 +33,22 @@
                         · Due {{ $invoice->due_on->format('M j, Y') }}
                     @endif
                 </p>
+
+                @can('approve', $invoice)
+                    @if($invoice->status !== \App\Enums\Billing\InvoiceStatus::Void)
+                        <div class="flex items-center gap-2 mt-3">
+                            <label for="dueOnInput" class="text-xs text-default-400">Due date</label>
+                            <input type="date" id="dueOnInput" class="form-input form-input-sm w-40"
+                                   value="{{ $invoice->due_on?->toDateString() }}">
+                            <button type="button" class="btn btn-sm btn-light" id="saveDueDateBtn">Set</button>
+                            <span class="text-xs text-default-400">
+                                @if($invoice->due_on === null)
+                                    Defaults to {{ $invoice->business->payment_terms_days }} days after approval.
+                                @endif
+                            </span>
+                        </div>
+                    @endif
+                @endcan
             </div>
             <div class="flex flex-wrap gap-2">
                 <a href="{{ route('admin.billing.invoices.preview', $invoice) }}" target="_blank"
@@ -65,6 +81,12 @@
                     @if($invoice->status !== \App\Enums\Billing\InvoiceStatus::Void)
                         <button type="button" class="btn btn-sm btn-light text-danger" id="voidBtn">
                             <i data-lucide="ban" class="size-4 me-1"></i> Void
+                        </button>
+                    @elseif($invoice->sent_at === null && $invoice->payments()->withTrashed()->doesntExist())
+                        {{-- Only a voided invoice the client never received can go: one
+                             that was sent exists outside this system too. --}}
+                        <button type="button" class="btn btn-sm btn-light text-danger" id="deleteBtn">
+                            <i data-lucide="trash-2" class="size-4 me-1"></i> Delete
                         </button>
                     @endif
                 @endcan
@@ -356,6 +378,38 @@ document.addEventListener('DOMContentLoaded', function () {
         );
         if (!ok) return;
         report(await post(`${base}/void`), 'Could not void.');
+    });
+
+    document.getElementById('saveDueDateBtn')?.addEventListener('click', async () => {
+        const value = document.getElementById('dueOnInput').value;
+        if (!value) { Alert.error('Choose a date first.'); return; }
+
+        const body = new FormData();
+        body.append('_method', 'PATCH');
+        body.append('due_on', value);
+        report(await post(`${base}/due-date`, body), 'Could not set the due date.');
+    });
+
+    document.getElementById('deleteBtn')?.addEventListener('click', async () => {
+        const ok = await Alert.confirmDelete(
+            'This voided invoice was never sent, so nothing outside this system references it. '
+            + 'Its number stays used so the sequence keeps its meaning.',
+            'Delete this invoice?',
+        );
+        if (!ok) return;
+
+        const r = await fetch(base, {
+            method: 'DELETE',
+            headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+        });
+        const data = await r.json();
+
+        if (data.success) {
+            Alert.toast(data.message, 'success');
+            setTimeout(() => { window.location = data.redirect; }, 700);
+        } else {
+            Alert.html(data.message || 'Could not delete.', 'Not allowed');
+        }
     });
 
     document.getElementById('addLineBtn')?.addEventListener('click', () => {

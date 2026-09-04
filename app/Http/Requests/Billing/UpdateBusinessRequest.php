@@ -37,6 +37,8 @@ final class UpdateBusinessRequest extends FormRequest
             'tax_registered_from' => ['nullable', 'date'],
             'daily_reminder_time' => ['required', 'date_format:H:i'],
             'late_fee_terms' => ['nullable', 'string', 'max:2000'],
+            'payment_terms_days' => ['sometimes', 'integer', 'min:0', 'max:365'],
+            'cheque_payable_to' => ['nullable', 'string', 'max:255'],
         ];
     }
 }

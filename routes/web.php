@@ -172,6 +172,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'email.verified', '2
         Route::post('invoices/{invoice}/approve', [InvoiceController::class, 'approve'])->name('invoices.approve');
         Route::post('invoices/{invoice}/sent', [InvoiceController::class, 'markSent'])->name('invoices.sent');
         Route::post('invoices/{invoice}/void', [InvoiceController::class, 'void'])->name('invoices.void');
+        Route::patch('invoices/{invoice}/due-date', [InvoiceController::class, 'updateDueDate'])->name('invoices.due-date');
+        Route::delete('invoices/{invoice}', [InvoiceController::class, 'destroy'])->name('invoices.destroy');
         Route::post('invoices/{invoice}/lines', [InvoiceController::class, 'storeLine'])->name('invoices.lines.store');
         Route::delete('invoices/{invoice}/lines/{line}', [InvoiceController::class, 'destroyLine'])->name('invoices.lines.destroy');
         Route::post('invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('invoices.payments.store');

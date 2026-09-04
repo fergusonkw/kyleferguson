@@ -14,6 +14,7 @@ use App\Mail\Billing\ClientInvoiceMail;
 use App\Models\Billing\Client;
 use App\Models\Billing\Invoice;
 use App\Models\Billing\InvoiceLine;
+use App\Services\AuditLogger;
 use App\Services\Billing\BillingPeriod;
 use App\Services\Billing\CurrentBusiness;
 use App\Services\Billing\FxRateService;
@@ -22,6 +23,7 @@ use App\Services\Billing\InvoiceBuilder;
 use App\Services\Billing\InvoicePdfRenderer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -35,6 +37,7 @@ final class InvoiceController extends Controller
         private readonly InvoiceApprover $approver,
         private readonly InvoicePdfRenderer $pdf,
         private readonly FxRateService $fxRates,
+        private readonly AuditLogger $audit,
     ) {}
 
     public function index(): View
@@ -269,6 +272,101 @@ final class InvoiceController extends Controller
         $this->builder->recalculateTotals($invoice->fresh());
 
         return response()->json(['success' => true, 'message' => 'Line removed.']);
+    }
+
+    /**
+     * Override the due date.
+     *
+     * The default comes from the business's payment terms at approval, but a
+     * single invoice sometimes needs its own — due on receipt, or a date
+     * agreed with the client. Setting it on a draft makes approval honour it.
+     */
+    public function updateDueDate(Request $request, Invoice $invoice): JsonResponse
+    {
+        $this->authorize('approve', $invoice);
+
+        if ($invoice->status === InvoiceStatus::Void) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A voided invoice cannot be re-dated.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'due_on' => ['required', 'date'],
+        ]);
+
+        $dueOn = Carbon::parse($validated['due_on'])->startOfDay();
+
+        // A due date before the issue date would be past due the moment the
+        // client received it.
+        if ($invoice->issued_on !== null && $dueOn->lessThan($invoice->issued_on)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The due date cannot fall before the issue date of '
+                    .$invoice->issued_on->format('F j, Y').'.',
+            ], 422);
+        }
+
+        $invoice->forceFill(['due_on' => $dueOn->toDateString()])->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Due date set to '.$dueOn->format('F j, Y').'.',
+        ]);
+    }
+
+    /**
+     * Delete a voided invoice that never reached a client.
+     *
+     * Voiding stays permanent for anything that was sent — the client holds a
+     * copy, so the record has to survive. But an invoice voided before it was
+     * ever issued exists only here, and being unable to clear it means test
+     * runs and mistakes accumulate forever. Its number stays consumed either
+     * way, so the sequence keeps its meaning.
+     */
+    public function destroy(Invoice $invoice): JsonResponse
+    {
+        $this->authorize('void', $invoice);
+
+        if ($invoice->status !== InvoiceStatus::Void) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only a voided invoice can be deleted. Void it first.',
+            ], 422);
+        }
+
+        if ($invoice->sent_at !== null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This invoice was sent to the client, so it stays on the record. '
+                    .'Voided is as far as it goes.',
+            ], 422);
+        }
+
+        if ($invoice->payments()->withTrashed()->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This invoice has payments recorded against it and cannot be deleted.',
+            ], 422);
+        }
+
+        $number = $invoice->invoice_number;
+
+        $this->audit->logCritical('invoice_deleted', $invoice, null, [
+            'invoice_id' => $invoice->id,
+            'invoice_number' => $number,
+            'business_id' => $invoice->business_id,
+            'client_id' => $invoice->client_id,
+        ], ['billing', 'invoice']);
+
+        $invoice->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$number} deleted. Its number stays used, so the sequence has no gap.",
+            'redirect' => route('admin.billing.invoices.index'),
+        ]);
     }
 
     public function downloadPdf(Invoice $invoice): StreamedResponse

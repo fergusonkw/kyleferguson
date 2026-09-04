@@ -76,6 +76,20 @@
             </div>
 
             <hr class="border-default-200 my-4">
+            <p class="text-xs font-semibold uppercase text-default-400 tracking-wider mb-3">Payment</p>
+            <div class="grid grid-cols-2 gap-3">
+                <x-admin-v2.form.input name="payment_terms_days" type="number" min="0" max="365"
+                    label="Payment Terms (days)" placeholder="14" />
+                <x-admin-v2.form.input name="cheque_payable_to" label="Cheque Payable To"
+                    placeholder="Kyle Ferguson" />
+            </div>
+            <p class="text-xs text-default-400 -mt-2 mb-3">
+                Terms set an invoice's due date when it is approved; the date can still be overridden per
+                invoice. The cheque payee appears in the invoice's payment details — leave it blank to omit
+                that line.
+            </p>
+
+            <hr class="border-default-200 my-4">
             <p class="text-xs font-semibold uppercase text-default-400 tracking-wider mb-3">Tax &amp; Late Fees</p>
             <x-admin-v2.form.input name="tax_registered_from" type="date" label="GST/HST Registered From (optional)" />
             <x-admin-v2.form.textarea name="late_fee_terms" label="Late Fee Terms (rendered on invoice footer)" rows="2"
@@ -109,7 +123,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('businessId').value = b.id;
         for (const k of ['name','legal_name','address','contact_email','notification_email','brand_primary_color',
             'brand_secondary_color','invoice_number_prefix','default_currency','fx_source','tax_registered_from',
-            'daily_reminder_time','late_fee_terms']) {
+            'daily_reminder_time','late_fee_terms','payment_terms_days','cheque_payable_to']) {
             const el = document.querySelector(`[name="${k}"]`);
             if (el) el.value = b[k] ?? '';
         }
@@ -126,6 +140,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.querySelector('input[name="default_currency"]').value = 'CAD';
         document.querySelector('input[name="fx_source"]').value = 'bank_of_canada';
         document.querySelector('input[name="daily_reminder_time"]').value = '08:00';
+        document.querySelector('input[name="payment_terms_days"]').value = '14';
         const cad = document.querySelector('input[name="supported_currencies[]"][value="CAD"]');
         if (cad) cad.checked = true;
         HSOverlay.open('#businessOffcanvas');

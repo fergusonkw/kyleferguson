@@ -39,11 +39,18 @@ final class InvoiceApprover
 
         return $this->apply($invoice, InvoiceStatus::Approved, function (Invoice $invoice): void {
             $issuedOn = now();
+
+            // A due date set by hand on the draft is a deliberate choice —
+            // "due on receipt", a date negotiated for this one invoice — so
+            // approval honours it instead of overwriting it with the default.
+            $dueOn = $invoice->due_on
+                ?? $issuedOn->copy()->addDays($invoice->business->payment_terms_days);
+
             $invoice->forceFill([
                 'status' => InvoiceStatus::Approved,
                 'approved_at' => $issuedOn,
                 'issued_on' => $issuedOn->toDateString(),
-                'due_on' => $issuedOn->copy()->addDays($invoice->business->payment_terms_days)->toDateString(),
+                'due_on' => $dueOn->toDateString(),
             ])->save();
         });
     }
