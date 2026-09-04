@@ -5,48 +5,8 @@
  * persistence, and Lucide icon re-creation for dynamically injected markup.
  */
 
-import {
-    createIcons,
-    CircleDot, Package, ShieldCheck, Trophy, Check,
-    LayoutDashboard, CalendarDays, FileUp, Users,
-    Building2, Sigma, Truck, Files, Image, Gavel, Megaphone, ClipboardList,
-    UserCog, KeyRound, FileBarChart2, Database, Timer, BarChart2, Wrench,
-    Menu, ChevronDown, Mails, Bell, Moon, Sun, CircleUser, LogOut,
-    Settings, Settings2, X,
-    AlertCircle, AlertTriangle, CircleCheck, Home, HelpCircle, Info, Lightbulb, ChevronUp,
-    CalendarClock, ClipboardCheck, Car, CalendarCheck, ShieldUser,
-    Plus, Eye, Pencil, Trash2, GitMerge, UserMinus, UserPlus,
-    ArrowRight, ArrowLeft, ChevronRight, RefreshCw, Star, Globe,
-    Wand2, Search, Printer, MessageCircle, MapPin, MailX, LockOpen,
-    Lock, ListOrdered, GripVertical, Flag, Download, Save, Copy,
-    Clock, Camera, Calculator, BellOff, Archive, Ban, ShoppingCart,
-    TableProperties, FileText, PhoneCall, Mail, ExternalLink, Link, RotateCcw,
-    BarChart, Calendar, CheckCircle, CheckSquare, ChartLine, CircleX,
-    CloudUpload, File, FileCode, FileSearch, Filter, FunctionSquare,
-    Key, List, Loader2, Monitor, Play, PlusCircle, RotateCw, Ruler,
-    TriangleAlert, Undo, Upload, Wand, XCircle,
-} from "lucide";
-
-const explicitIcons = {
-    CircleDot, Package, ShieldCheck, Trophy, Check,
-    LayoutDashboard, CalendarDays, FileUp, Users,
-    Building2, Sigma, Truck, Files, Image, Gavel, Megaphone, ClipboardList,
-    UserCog, KeyRound, FileBarChart2, Database, Timer, BarChart2, Wrench,
-    Menu, ChevronDown, Mails, Bell, Moon, Sun, CircleUser, LogOut,
-    Settings, Settings2, X,
-    AlertCircle, AlertTriangle, CircleCheck, Home, HelpCircle, Info, Lightbulb, ChevronUp,
-    CalendarClock, ClipboardCheck, Car, CalendarCheck, ShieldUser,
-    Plus, Eye, Pencil, Trash2, GitMerge, UserMinus, UserPlus,
-    ArrowRight, ArrowLeft, ChevronRight, RefreshCw, Star, Globe,
-    Wand2, Search, Printer, MessageCircle, MapPin, MailX, LockOpen,
-    Lock, ListOrdered, GripVertical, Flag, Download, Save, Copy,
-    Clock, Camera, Calculator, BellOff, Archive, Ban, ShoppingCart,
-    TableProperties, FileText, PhoneCall, Mail, ExternalLink, Link, RotateCcw,
-    BarChart, Calendar, CheckCircle, CheckSquare, ChartLine, CircleX,
-    CloudUpload, File, FileCode, FileSearch, Filter, FunctionSquare,
-    Key, List, Loader2, Monitor, Play, PlusCircle, RotateCw, Ruler,
-    TriangleAlert, Undo, Upload, Wand, XCircle,
-};
+import { createIcons } from "lucide";
+import { adminIcons } from "./icons.js";
 
 const STORAGE_KEY = "__THEME_CONFIG__";
 const html = document.documentElement;
@@ -220,15 +180,39 @@ function initThemeToggle() {
     });
 }
 
-// ---------- Lucide icon observer ----------
+// ---------- Lucide icon rendering ----------
 // Re-creates icons whenever new placeholder <i data-lucide> tags appear in
 // the DOM (Preline modals, DataTables rows, AJAX partials).
-// Filters to <i>/<span> only — Lucide preserves `data-lucide` on its
-// rendered <svg>, so matching SVGs would cause an infinite loop.
+// The observer guard filters to <i>/<span> — Lucide preserves `data-lucide`
+// on its rendered <svg>, so matching SVGs would spin forever.
+
+/**
+ * Render every outstanding icon placeholder.
+ *
+ * Lucide leaves a placeholder untouched (console.warn only) when its name is
+ * not in the registry. That would keep the observer guard below matching
+ * forever, and every pass re-replaces all rendered SVGs — a mutation that
+ * retriggers the observer, looping the page until it locks up. So any
+ * placeholder still standing after a render pass has its `data-lucide`
+ * swapped for an inert marker: the icon is simply missing, which is a
+ * cosmetic bug, instead of hanging the page.
+ */
+function renderIcons() {
+    createIcons({ icons: adminIcons });
+
+    document.querySelectorAll("i[data-lucide], span[data-lucide]").forEach((el) => {
+        const name = el.getAttribute("data-lucide");
+        el.removeAttribute("data-lucide");
+        el.setAttribute("data-lucide-unregistered", name);
+        console.warn(
+            `[icons] "${name}" is not registered in resources/js/admin-v2/icons.js — nothing rendered.`,
+        );
+    });
+}
 
 const iconObserver = new MutationObserver(() => {
     if (document.querySelector("i[data-lucide], span[data-lucide]")) {
-        createIcons({ icons: explicitIcons });
+        renderIcons();
     }
 });
 
@@ -276,7 +260,7 @@ ready(() => {
     initSidenav();
     initThemeToggle();
     initOverlayBackdropCleanup();
-    createIcons({ icons: explicitIcons });
+    renderIcons();
 
     window.addEventListener("resize", adjustLayout);
     iconObserver.observe(document.body, { childList: true, subtree: true });
