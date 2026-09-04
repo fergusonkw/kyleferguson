@@ -16,7 +16,9 @@
         "mews/purifier": "^3.4",
         "motomedialab/smtp2go": "^1.3",
         "pragmarx/google2fa": "^9.0",
-        "sentry/sentry-laravel": "*"
+        "sentry/sentry-laravel": "*",
+        "spatie/browsershot": "^5.4",
+        "spatie/laravel-pdf": "^2.13"
     },
     "require-dev": {
         "barryvdh/laravel-ide-helper": "^3.7",
