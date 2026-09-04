@@ -105,12 +105,18 @@
                                 <tr>
                                     <td>
                                         <div class="font-medium">{{ $line->label }}</div>
+                                        @if(filled($line->description))
+                                            <div class="text-xs text-default-500 mt-1 whitespace-pre-line">{{ $line->description }}</div>
+                                        @endif
                                         @if($line->children->isNotEmpty())
                                             <div class="text-xs text-default-400 mt-1">
                                                 @foreach($line->children as $child)
                                                     <span class="me-3">{{ $child->label }} {{ $money($child->amount) }}</span>
                                                 @endforeach
                                             </div>
+                                        @endif
+                                        @if($line->conversionNote())
+                                            <div class="text-xs text-default-400 mt-1">{{ $line->conversionNote() }}</div>
                                         @endif
                                     </td>
                                     <td><span class="badge bg-default">{{ $line->line_type->label() }}</span></td>
@@ -231,13 +237,22 @@
         <x-admin-v2.offcanvas canvasId="lineOffcanvas" title="Add Line" size="medium">
             <form id="lineForm">
                 @csrf
-                <x-admin-v2.form.input name="label" label="Description" :required="true" placeholder="Consulting — August" />
+                <x-admin-v2.form.input name="label" label="Title" :required="true" placeholder="Consulting — August" />
+                <x-admin-v2.form.textarea name="description" label="Details" rows="4"
+                                          placeholder="What this line covers. Shown to the client under the title — use it to break down a large figure." />
                 <x-admin-v2.form.select name="line_type" label="Type" :required="true" :options="$lineTypes" />
-                <x-admin-v2.form.input name="amount" type="number" step="0.01" label="Amount" :required="true" placeholder="0.00" />
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="col-span-2">
+                        <x-admin-v2.form.input name="amount" type="number" step="0.01" label="Amount" :required="true" placeholder="0.00" />
+                    </div>
+                    <x-admin-v2.form.select name="currency" label="Currency" :options="$lineCurrencies"
+                                            :selected="$invoice->issue_currency" />
+                </div>
                 <p class="text-xs text-default-400 -mt-2 mb-3">
                     Enter discounts and credits as a positive amount — they are applied as reductions.
-                    Hosting and recurring lines are derived and cannot be added here; use an adjustment
-                    so the original figure stays on the record.
+                    A line in another currency is converted at this period's rate, and the invoice shows
+                    the original amount and rate beside it. Hosting and recurring lines are derived and
+                    cannot be added here; use an adjustment so the original figure stays on the record.
                 </p>
                 <div class="border-t border-default-200 flex gap-2 justify-end pt-4 mt-4">
                     <button type="button" class="btn btn-light" data-hs-overlay="#lineOffcanvas">Cancel</button>

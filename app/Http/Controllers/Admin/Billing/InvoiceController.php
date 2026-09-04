@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Admin\Billing;
 
 use App\Enums\Billing\InvoiceLineType;
 use App\Enums\Billing\InvoiceStatus;
+use App\Enums\Billing\PaymentMethod;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Billing\GenerateInvoiceRequest;
 use App\Http\Requests\Billing\StoreInvoiceLineRequest;
@@ -14,6 +15,7 @@ use App\Models\Billing\Invoice;
 use App\Models\Billing\InvoiceLine;
 use App\Services\Billing\BillingPeriod;
 use App\Services\Billing\CurrentBusiness;
+use App\Services\Billing\FxRateService;
 use App\Services\Billing\InvoiceApprover;
 use App\Services\Billing\InvoiceBuilder;
 use App\Services\Billing\InvoicePdfRenderer;
@@ -30,6 +32,7 @@ final class InvoiceController extends Controller
         private readonly InvoiceBuilder $builder,
         private readonly InvoiceApprover $approver,
         private readonly InvoicePdfRenderer $pdf,
+        private readonly FxRateService $fxRates,
     ) {}
 
     public function index(): View
@@ -105,7 +108,8 @@ final class InvoiceController extends Controller
             'lineTypes' => collect(InvoiceLineType::operatorEditable())
                 ->mapWithKeys(fn (InvoiceLineType $t): array => [$t->value => $t->label()])
                 ->all(),
-            'paymentMethods' => \App\Enums\Billing\PaymentMethod::options(),
+            'lineCurrencies' => $this->lineCurrenciesFor($invoice),
+            'paymentMethods' => PaymentMethod::options(),
         ]);
     }
 
@@ -182,7 +186,20 @@ final class InvoiceController extends Controller
         $validated = $request->validated();
 
         $type = InvoiceLineType::from($validated['line_type']);
-        $amount = (string) $validated['amount'];
+        $sourceAmount = (string) $validated['amount'];
+        $sourceCurrency = mb_strtoupper($validated['currency'] ?? $invoice->issue_currency);
+
+        // A one-off cost can be incurred in a currency the client is not billed
+        // in — a domain renewal priced in USD on a CAD invoice. Convert at the
+        // period's rate and keep what was actually charged alongside it, so the
+        // billed figure can be explained rather than just asserted.
+        try {
+            $rate = $this->fxRates->rateFor($sourceCurrency, $invoice->issue_currency, $invoice->period);
+        } catch (Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+
+        $amount = number_format((float) $sourceAmount * $rate, 2, '.', '');
 
         // Reductions are stored negative regardless of how they were typed, so
         // the total is a plain sum of the lines.
@@ -190,17 +207,28 @@ final class InvoiceController extends Controller
             $amount = '-'.ltrim($amount, '-');
         }
 
+        $converted = $sourceCurrency !== $invoice->issue_currency;
+
         InvoiceLine::create([
             'invoice_id' => $invoice->id,
             'label' => $validated['label'],
+            'description' => $validated['description'] ?? null,
             'line_type' => $type,
             'amount' => $amount,
+            'source_amount' => $converted ? $sourceAmount : null,
+            'source_currency' => $converted ? $sourceCurrency : null,
+            'fx_rate_applied' => $converted ? $rate : null,
             'display_order' => (int) $invoice->lines()->max('display_order') + 1,
         ]);
 
         $this->builder->recalculateTotals($invoice->fresh());
 
-        return response()->json(['success' => true, 'message' => 'Line added.']);
+        return response()->json([
+            'success' => true,
+            'message' => $converted
+                ? sprintf('Line added — %s %s converted to %s %s.', $sourceCurrency, $sourceAmount, $invoice->issue_currency, ltrim($amount, '-'))
+                : 'Line added.',
+        ]);
     }
 
     public function destroyLine(Invoice $invoice, InvoiceLine $line): JsonResponse
@@ -277,6 +305,23 @@ final class InvoiceController extends Controller
         } catch (Throwable $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
+    }
+
+    /**
+     * Currencies a manual line may be entered in: the invoice's own, plus
+     * anything the business supports.
+     *
+     * @return array<string, string>
+     */
+    private function lineCurrenciesFor(Invoice $invoice): array
+    {
+        return collect([$invoice->issue_currency, $invoice->business->default_currency])
+            ->merge($invoice->business->supported_currencies ?? [])
+            ->filter()
+            ->map(fn (string $c): string => mb_strtoupper($c))
+            ->unique()
+            ->mapWithKeys(fn (string $c): array => [$c => $c])
+            ->all();
     }
 
     /**

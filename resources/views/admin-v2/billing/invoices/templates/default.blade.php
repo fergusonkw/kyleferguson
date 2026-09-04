@@ -137,6 +137,11 @@
   table.line-items td .item-title { font-weight: 700; color: var(--ink); }
   table.line-items td .item-desc { font-size: 8.8pt; color: var(--mute); margin-top: 2px; }
   table.line-items td .item-desc span { display: inline-block; margin-right: 14px; }
+  /* Free-text explanation of a line — wraps and keeps its line breaks. */
+  table.line-items td .item-note {
+    font-size: 8.8pt; color: var(--body); margin-top: 3px;
+    line-height: 1.5; white-space: pre-line; max-width: 46em;
+  }
 
   .totals-wrap { display: flex; justify-content: flex-end; margin-top: 18px; }
   table.totals { width: 300px; border-collapse: collapse; font-size: 9.6pt; }
@@ -260,12 +265,18 @@
           <tr>
             <td>
               <div class="item-title">{{ $line->label }}</div>
+              @if(filled($line->description))
+                <div class="item-note">{{ $line->description }}</div>
+              @endif
               @if($line->children->isNotEmpty())
                 <div class="item-desc">
                   @foreach($line->children as $child)
                     <span>{{ $child->label }} {{ $money($child->amount) }}</span>
                   @endforeach
                 </div>
+              @endif
+              @if($line->conversionNote())
+                <div class="item-desc"><span>{{ $line->conversionNote() }}</span></div>
               @endif
             </td>
             <td class="right">{{ $money($line->amount) }}</td>
@@ -307,6 +318,9 @@
       <div class="well">
         <h3>Payment Details</h3>
         <p style="margin:0 0 6px;"><strong>Interac e-Transfer:</strong> {{ $business['contact_email'] ?? '' }}</p>
+        @if(!empty($business['cheque_payable_to']))
+          <p style="margin:0 0 6px;"><strong>Cheque payable to:</strong> {{ $business['cheque_payable_to'] }}</p>
+        @endif
         <p style="margin:0;"><em>Please reference {{ $invoice->invoice_number }} with payment.</em></p>
       </div>
       <div class="well">

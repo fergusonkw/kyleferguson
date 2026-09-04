@@ -24,6 +24,7 @@ final class StoreInvoiceLineRequest extends FormRequest
     {
         return [
             'label' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:2000'],
             'line_type' => [
                 'required',
                 Rule::in(array_map(
@@ -32,6 +33,10 @@ final class StoreInvoiceLineRequest extends FormRequest
                 )),
             ],
             'amount' => ['required', 'numeric'],
+
+            // A line may be incurred in a currency the client is not billed in;
+            // it is converted at the invoice period's rate.
+            'currency' => ['nullable', 'string', 'size:3', Rule::in($this->allowedCurrencies())],
         ];
     }
 
@@ -42,7 +47,27 @@ final class StoreInvoiceLineRequest extends FormRequest
     {
         return [
             'line_type.in' => 'Derived lines cannot be added by hand — use an adjustment instead.',
+            'currency.in' => 'That currency is not one this business supports. Add it to the business first.',
         ];
+    }
+
+    /**
+     * The invoice's own currency plus whatever the business supports, so a
+     * one-off cost can be entered in the currency it was actually charged in.
+     *
+     * @return list<string>
+     */
+    public function allowedCurrencies(): array
+    {
+        $invoice = $this->invoice();
+
+        return collect([$invoice->issue_currency, $invoice->business->default_currency])
+            ->merge($invoice->business->supported_currencies ?? [])
+            ->filter()
+            ->map(fn (string $c): string => mb_strtoupper($c))
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public function withValidator(Validator $validator): void

@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $legal_name
  * @property string|null $address
  * @property string $contact_email
+ * @property string|null $cheque_payable_to
  * @property string|null $logo_path
  * @property string|null $brand_primary_color
  * @property string|null $brand_secondary_color
@@ -50,6 +51,7 @@ final class Business extends Model
         'legal_name',
         'address',
         'contact_email',
+        'cheque_payable_to',
         'logo_path',
         'brand_primary_color',
         'brand_secondary_color',

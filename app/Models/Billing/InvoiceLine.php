@@ -16,8 +16,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $parent_id
  * @property int|null $project_id
  * @property string $label
+ * @property string|null $description
  * @property InvoiceLineType $line_type
  * @property string $amount
+ * @property string|null $source_amount
+ * @property string|null $source_currency
+ * @property string|null $fx_rate_applied
  * @property string|null $cost_basis_usd
  * @property string|null $source_reference
  * @property bool $is_display_only
@@ -43,8 +47,12 @@ final class InvoiceLine extends Model
         'parent_id',
         'project_id',
         'label',
+        'description',
         'line_type',
         'amount',
+        'source_amount',
+        'source_currency',
+        'fx_rate_applied',
         'cost_basis_usd',
         'source_reference',
         'is_display_only',
@@ -86,6 +94,34 @@ final class InvoiceLine extends Model
     }
 
     /**
+     * Whether this line was incurred in a currency other than the one the
+     * invoice is issued in, and so carries a conversion worth showing.
+     */
+    public function wasConverted(): bool
+    {
+        return $this->source_currency !== null
+            && $this->source_currency !== $this->invoice->issue_currency;
+    }
+
+    /**
+     * How the converted amount was arrived at, for the client to read —
+     * "USD 18.00 at 1.3750".
+     */
+    public function conversionNote(): ?string
+    {
+        if (! $this->wasConverted()) {
+            return null;
+        }
+
+        return sprintf(
+            '%s %s at %s',
+            $this->source_currency,
+            number_format((float) $this->source_amount, 2),
+            rtrim(rtrim((string) $this->fx_rate_applied, '0'), '.'),
+        );
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
@@ -93,6 +129,8 @@ final class InvoiceLine extends Model
         return [
             'line_type' => InvoiceLineType::class,
             'amount' => 'decimal:2',
+            'source_amount' => 'decimal:2',
+            'fx_rate_applied' => 'decimal:8',
             'cost_basis_usd' => 'decimal:4',
             'is_display_only' => 'boolean',
             'metadata' => 'array',
