@@ -145,6 +145,13 @@
                         </a>
                     </li>
                     @endcan
+
+                    <li class="menu-item">
+                        <a href="{{ route('admin.billing.reconciliation.index') }}" class="menu-link">
+                            <span class="menu-icon"><i data-lucide="scale"></i></span>
+                            <span class="menu-text">Reconciliation</span>
+                        </a>
+                    </li>
                     @endcan
 
                 </ul>

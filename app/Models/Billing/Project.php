@@ -25,6 +25,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read Client $client
  * @property-read \Illuminate\Database\Eloquent\Collection<int, ProviderResource> $providerResources
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, CostLineItem> $costLineItems
  *
  * @method static \Database\Factories\Billing\ProjectFactory factory($count = null, $state = [])
  *
@@ -57,6 +58,12 @@ final class Project extends Model
     public function providerResources(): HasMany
     {
         return $this->hasMany(ProviderResource::class);
+    }
+
+    /** @return HasMany<CostLineItem, $this> */
+    public function costLineItems(): HasMany
+    {
+        return $this->hasMany(CostLineItem::class);
     }
 
     /**
