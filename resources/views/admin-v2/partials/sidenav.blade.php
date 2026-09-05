@@ -155,6 +155,15 @@
                     </li>
                     @endcan
 
+                    @can('viewAny', App\Models\Billing\RecurringLineTemplate::class)
+                    <li class="menu-item">
+                        <a href="{{ route('admin.billing.recurring-lines.index') }}" class="menu-link">
+                            <span class="menu-icon"><i data-lucide="rotate-cw"></i></span>
+                            <span class="menu-text">Recurring Items</span>
+                        </a>
+                    </li>
+                    @endcan
+
                     <li class="menu-item">
                         <a href="{{ route('admin.billing.reconciliation.index') }}" class="menu-link">
                             <span class="menu-icon"><i data-lucide="scale"></i></span>

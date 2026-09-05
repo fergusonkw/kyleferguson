@@ -46,6 +46,7 @@ final class AppServiceProvider extends ServiceProvider
         Gate::policy(Project::class, ProjectPolicy::class);
         Gate::policy(CostProvider::class, CostProviderPolicy::class);
         Gate::policy(Invoice::class, InvoicePolicy::class);
+        Gate::policy(RecurringLineTemplate::class, RecurringLineTemplatePolicy::class);
 
         // Permission-backed gates for resources without an Eloquent model.
         Gate::define('viewAny-audit-logs', fn (User $user) => $user->hasPermission(Permission::ViewAuditLogs->value));

@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\Billing\InvoiceController;
 use App\Http\Controllers\Admin\Billing\PaymentController;
 use App\Http\Controllers\Admin\Billing\ProjectController as BillingProjectController;
 use App\Http\Controllers\Admin\Billing\ReconciliationController;
+use App\Http\Controllers\Admin\Billing\RecurringLineTemplateController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\LogViewerController;
 use App\Http\Controllers\Admin\MaintenanceController;
@@ -180,6 +181,15 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'email.verified', '2
         Route::delete('invoices/{invoice}/lines/{line}', [InvoiceController::class, 'destroyLine'])->name('invoices.lines.destroy');
         Route::post('invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('invoices.payments.store');
         Route::delete('invoices/{invoice}/payments/{payment}', [PaymentController::class, 'destroy'])->name('invoices.payments.destroy');
+
+        // Recurring line templates
+        Route::get('recurring-lines', [RecurringLineTemplateController::class, 'index'])->name('recurring-lines.index');
+        Route::get('recurring-lines/data', [RecurringLineTemplateController::class, 'data'])->name('recurring-lines.data');
+        Route::get('recurring-lines/targets', [RecurringLineTemplateController::class, 'targets'])->name('recurring-lines.targets');
+        Route::post('recurring-lines', [RecurringLineTemplateController::class, 'store'])->name('recurring-lines.store');
+        Route::get('recurring-lines/{recurringLineTemplate}/edit', [RecurringLineTemplateController::class, 'edit'])->name('recurring-lines.edit');
+        Route::put('recurring-lines/{recurringLineTemplate}', [RecurringLineTemplateController::class, 'update'])->name('recurring-lines.update');
+        Route::delete('recurring-lines/{recurringLineTemplate}', [RecurringLineTemplateController::class, 'destroy'])->name('recurring-lines.destroy');
 
         // Reconciliation
         Route::get('reconciliation', [ReconciliationController::class, 'index'])->name('reconciliation.index');
