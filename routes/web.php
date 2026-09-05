@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\Billing\CostProviderController;
 use App\Http\Controllers\Admin\Billing\InvoiceController;
 use App\Http\Controllers\Admin\Billing\PaymentController;
 use App\Http\Controllers\Admin\Billing\ProjectController as BillingProjectController;
+use App\Http\Controllers\Admin\Billing\ReceivablesController;
 use App\Http\Controllers\Admin\Billing\ReconciliationController;
 use App\Http\Controllers\Admin\Billing\RecurringLineTemplateController;
 use App\Http\Controllers\Admin\DashboardController;
@@ -190,6 +191,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'email.verified', '2
         Route::get('recurring-lines/{recurringLineTemplate}/edit', [RecurringLineTemplateController::class, 'edit'])->name('recurring-lines.edit');
         Route::put('recurring-lines/{recurringLineTemplate}', [RecurringLineTemplateController::class, 'update'])->name('recurring-lines.update');
         Route::delete('recurring-lines/{recurringLineTemplate}', [RecurringLineTemplateController::class, 'destroy'])->name('recurring-lines.destroy');
+
+        // Receivables
+        Route::get('receivables', [ReceivablesController::class, 'index'])->name('receivables.index');
 
         // Reconciliation
         Route::get('reconciliation', [ReconciliationController::class, 'index'])->name('reconciliation.index');

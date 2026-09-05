@@ -148,10 +148,21 @@ final class Invoice extends Model
 
     /**
      * Sum of live (non-voided) payments.
+     *
+     * Prefers an aggregate the query already loaded via `withSum('payments',
+     * 'amount')`, so listing invoices costs one query rather than one sum per
+     * row. Falls back to querying when nothing was preloaded, which keeps every
+     * existing caller working unchanged.
      */
     public function amountPaid(): string
     {
-        return number_format((float) $this->payments()->sum('amount'), 2, '.', '');
+        // Checked by key, not by null: the aggregate is null for an invoice
+        // with no payments, which is an answer, not a missing value.
+        $sum = array_key_exists('payments_sum_amount', $this->attributes)
+            ? ($this->attributes['payments_sum_amount'] ?? 0)
+            : $this->payments()->sum('amount');
+
+        return number_format((float) $sum, 2, '.', '');
     }
 
     public function balanceDue(): string
