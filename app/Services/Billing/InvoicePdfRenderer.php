@@ -27,6 +27,7 @@ final class InvoicePdfRenderer
     public function __construct(
         private readonly ViewFactory $views,
         private readonly BusinessLogoStore $logos,
+        private readonly InvoiceFontStore $fonts,
     ) {}
 
     /**
@@ -48,6 +49,10 @@ final class InvoicePdfRenderer
             // string with no document base, so a relative URL would resolve to
             // nothing and the logo would vanish from every PDF.
             'logoDataUri' => $this->logos->dataUri($invoice->business_snapshot['logo_path'] ?? null),
+
+            // Same reasoning as the logo, for the same reason: a linked
+            // stylesheet is not dependable from a bare HTML string.
+            'fontFaceCss' => $this->fonts->faceCss(),
         ], $extra))->render();
     }
 

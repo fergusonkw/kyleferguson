@@ -19,6 +19,9 @@
     // Absent when the business has no logo, or when the file behind a
     // snapshotted path has gone — the monogram stands in either way.
     $logoDataUri ??= null;
+    // Empty rather than null: a template rendered without the store still
+    // produces valid CSS, it just falls back to system faces.
+    $fontFaceCss ??= '';
     $hosted = $banner !== null || $downloadUrl !== null;
 
     $business = $invoice->business_snapshot ?? [];
@@ -67,10 +70,13 @@
   <meta name="robots" content="noindex, nofollow">
 @endif
 <title>{{ $invoice->invoice_number }} — {{ $business['name'] ?? 'Invoice' }}</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
+{{-- Inlined rather than linked: Browsershot renders from a bare HTML string
+     with no document base and no promise of network access, so a stylesheet
+     link would leave the same invoice printing two different ways depending
+     on the host. Empty when the fonts have not been vendored, in which case
+     the fallback stacks below take over. --}}
+{!! $fontFaceCss !!}
   :root {
     --charcoal:  {{ $charcoal }};
     --ink:       #1a1c21;

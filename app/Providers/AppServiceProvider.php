@@ -21,6 +21,7 @@ use App\Policies\RolePolicy;
 use App\Policies\UserPolicy;
 use App\Services\AuditLogger;
 use App\Services\Billing\CurrentBusiness;
+use App\Services\Billing\InvoiceFontStore;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -33,6 +34,10 @@ final class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(AuditLogger::class);
         $this->app->singleton(CurrentBusiness::class);
+
+        // Singleton so the ~90KB of webfont carried by every invoice is read
+        // and base64-encoded once per process, not once per document.
+        $this->app->singleton(InvoiceFontStore::class);
     }
 
     public function boot(): void
