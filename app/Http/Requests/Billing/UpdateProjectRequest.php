@@ -7,6 +7,7 @@ namespace App\Http\Requests\Billing;
 use App\Enums\Billing\MarkupType;
 use App\Enums\Billing\ProjectStatus;
 use App\Http\Requests\Billing\Concerns\ValidatesMarkup;
+use App\Http\Requests\Billing\Concerns\ValidatesTermination;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -14,6 +15,7 @@ use Illuminate\Validation\Rule;
 final class UpdateProjectRequest extends FormRequest
 {
     use ValidatesMarkup;
+    use ValidatesTermination;
 
     public function authorize(): bool
     {
@@ -35,6 +37,10 @@ final class UpdateProjectRequest extends FormRequest
                 Rule::unique('projects', 'do_project_uuid')->ignore($project->id),
             ],
             'status' => ['required', Rule::enum(ProjectStatus::class)],
+
+            // Billing reads this, not the status: it decides the period from
+            // which a project's standing charges stop.
+            'terminated_at' => ['nullable', 'date'],
             'markup_type' => ['nullable', Rule::enum(MarkupType::class)],
             'markup_value' => ['nullable', 'numeric', 'min:0'],
             'markup_fee' => ['nullable', 'numeric', 'min:0'],
@@ -44,8 +50,19 @@ final class UpdateProjectRequest extends FormRequest
 
     public function withValidator(Validator $validator): void
     {
-        $validator->after(fn (Validator $v) => $this->validateMarkupComponents(
-            $v, $this->input('markup_type'), 'markup_value', 'markup_fee',
-        ));
+        $validator->after(function (Validator $v): void {
+            $this->validateMarkupComponents(
+                $v, $this->input('markup_type'), 'markup_value', 'markup_fee',
+            );
+            $this->validateTermination($v);
+        });
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function validated($key = null, $default = null): array
+    {
+        return $this->resolveTermination(parent::validated());
     }
 }

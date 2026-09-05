@@ -52,6 +52,15 @@
             <x-admin-v2.form.input name="name" label="Project Name" :required="true" />
             <x-admin-v2.form.select name="status" label="Status" :required="true" :options="$statusOptions" />
 
+            <div id="terminatedAtWrap" class="hidden">
+                <x-admin-v2.form.input name="terminated_at" type="date" label="Terminated On" />
+                <p class="text-xs text-default-400 -mt-3 mb-4">
+                    Standing charges on this project stop from the first period beginning after this
+                    date, so a project ended mid-month is still billed for the month it ran. Left blank,
+                    today's date is used.
+                </p>
+            </div>
+
             <hr class="border-default-200 my-4">
             <p class="text-xs font-semibold uppercase text-default-400 tracking-wider mb-3">DigitalOcean Link</p>
             <div class="mb-4">
@@ -133,14 +142,30 @@ document.addEventListener('DOMContentLoaded', function () {
     loadClients().catch(() => {});
     loadDoProjects().catch(() => {});
 
-    function resetForm () { document.getElementById('projectForm').reset(); }
+    const statusSelect = document.querySelector('select[name="status"]');
+
+    // The date only means anything for a terminated project, and the server
+    // rejects it on any other status, so it is only offered for that one.
+    function syncTerminatedField () {
+        const terminated = statusSelect.value === 'terminated';
+        document.getElementById('terminatedAtWrap').classList.toggle('hidden', !terminated);
+        if (!terminated) document.querySelector('[name="terminated_at"]').value = '';
+    }
+
+    statusSelect?.addEventListener('change', syncTerminatedField);
+
+    function resetForm () {
+        document.getElementById('projectForm').reset();
+        syncTerminatedField();
+    }
 
     function populate (p) {
-        for (const k of ['client_id','name','do_project_uuid','status','markup_type','markup_value','markup_fee','notes']) {
+        for (const k of ['client_id','name','do_project_uuid','status','terminated_at','markup_type','markup_value','markup_fee','notes']) {
             const el = document.querySelector(`[name="${k}"]`);
             if (el) el.value = p[k] ?? '';
         }
         document.getElementById('projectId').value = p.id;
+        syncTerminatedField();
     }
 
     document.getElementById('createProjectBtn')?.addEventListener('click', () => {
@@ -148,6 +173,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('projectOffcanvasLabel').textContent = 'Add Project';
         document.getElementById('projectFormMethod').value = 'POST';
         document.querySelector('select[name="status"]').value = 'active';
+        syncTerminatedField();
         HSOverlay.open('#projectOffcanvas');
     });
 

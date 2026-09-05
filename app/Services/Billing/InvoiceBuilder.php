@@ -360,11 +360,19 @@ final class InvoiceBuilder
         $templates = RecurringLineTemplate::query()
             ->forClient($client->id)
             ->activeDuring($periodStart, $periodEnd)
+            ->with('project')
             ->orderBy('label')
             ->get();
 
         foreach ($templates as $template) {
             if (! $template->billsInPeriod($periodStart, $periodEnd)) {
+                continue;
+            }
+
+            // A standing charge attached to a project stops when the project
+            // does. The template's own window governs client-wide charges;
+            // nothing but this stops a terminated project billing forever.
+            if ($template->project?->hadTerminatedBefore($periodStart) === true) {
                 continue;
             }
 

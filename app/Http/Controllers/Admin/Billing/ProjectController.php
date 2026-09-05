@@ -180,6 +180,7 @@ final class ProjectController extends Controller
                 'name' => $project->name,
                 'do_project_uuid' => $project->do_project_uuid,
                 'status' => $project->status->value,
+                'terminated_at' => $project->terminated_at?->format('Y-m-d'),
                 'markup_type' => $project->markup_type?->value,
                 'markup_value' => $project->markup_value,
                 'markup_fee' => $project->markup_fee,

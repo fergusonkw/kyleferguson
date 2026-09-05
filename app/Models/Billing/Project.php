@@ -6,6 +6,7 @@ namespace App\Models\Billing;
 
 use App\Enums\Billing\MarkupType;
 use App\Enums\Billing\ProjectStatus;
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -96,6 +97,22 @@ final class Project extends Model
     public function effectiveMarkupFee(): string
     {
         return $this->markup_fee ?? $this->client->default_markup_fee;
+    }
+
+    /**
+     * Whether the project had already ended when the given period began.
+     *
+     * Termination stops standing charges from the next period onward rather
+     * than immediately: a project ended mid-month is still owed for the month
+     * it ran, and cutting the final invoice short would under-bill it.
+     */
+    public function hadTerminatedBefore(DateTimeInterface $periodStart): bool
+    {
+        if ($this->terminated_at === null) {
+            return false;
+        }
+
+        return $this->terminated_at->lessThan($periodStart);
     }
 
     /**
