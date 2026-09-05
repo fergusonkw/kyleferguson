@@ -16,6 +16,9 @@
     // them, so the printed document stays the canonical record.
     $banner ??= null;
     $downloadUrl ??= null;
+    // Absent when the business has no logo, or when the file behind a
+    // snapshotted path has gone — the monogram stands in either way.
+    $logoDataUri ??= null;
     $hosted = $banner !== null || $downloadUrl !== null;
 
     $business = $invoice->business_snapshot ?? [];
@@ -110,6 +113,8 @@
     border-top: 1px solid var(--accent); border-left: 1px solid var(--accent);
   }
   .monogram span { font-weight: 700; font-size: 13px; letter-spacing: -0.02em; color: #e9e9ec; }
+  /* Bounded so an oversized upload cannot push the masthead around. */
+  .brand-logo { max-height: 46px; max-width: 180px; width: auto; flex-shrink: 0; }
   .issuer .name { font-size: 14pt; font-weight: 700; color: #f3f3f5; letter-spacing: -0.01em; line-height: 1.1; }
   .issuer .contact {
     font-family: var(--font-mono); font-size: 7.8pt; color: #b8bac1;
@@ -251,7 +256,11 @@
 
   <div class="masthead">
     <div class="issuer">
-      <div class="monogram"><span>{{ $monogram }}</span></div>
+      @if($logoDataUri !== null)
+        <img class="brand-logo" src="{{ $logoDataUri }}" alt="{{ $business['name'] ?? '' }}">
+      @else
+        <div class="monogram"><span>{{ $monogram }}</span></div>
+      @endif
       <div>
         <div class="name">{{ $issuerName }}</div>
         <div class="contact">{{ implode("\n", $issuerLines) }}</div>

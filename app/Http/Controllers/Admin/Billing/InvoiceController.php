@@ -23,6 +23,7 @@ use App\Services\Billing\InvoiceBuilder;
 use App\Services\Billing\InvoicePdfRenderer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\View\View;
@@ -475,11 +476,14 @@ final class InvoiceController extends Controller
     /**
      * Preview the rendered invoice exactly as the client will see it.
      */
-    public function preview(Invoice $invoice): View
+    public function preview(Invoice $invoice): Response
     {
         $this->authorize('view', $invoice);
 
-        return view($invoice->template_view_snapshot, ['invoice' => $invoice]);
+        // Through the renderer, not the view directly: the preview must be the
+        // same render the PDF gets, including its logo and its fallback when a
+        // business points at a template that no longer exists.
+        return response($this->pdf->html($invoice));
     }
 
     /**

@@ -24,7 +24,10 @@ final class InvoicePdfRenderer
 
     private const FALLBACK_TEMPLATE = 'admin-v2.billing.invoices.templates.default';
 
-    public function __construct(private readonly ViewFactory $views) {}
+    public function __construct(
+        private readonly ViewFactory $views,
+        private readonly BusinessLogoStore $logos,
+    ) {}
 
     /**
      * Render the invoice to HTML using its snapshotted template.
@@ -40,6 +43,11 @@ final class InvoicePdfRenderer
     {
         return $this->views->make($this->templateFor($invoice), array_merge([
             'invoice' => $invoice->loadMissing(['topLevelLines.children', 'business', 'client', 'payments']),
+
+            // Inlined rather than linked: Browsershot renders from an HTML
+            // string with no document base, so a relative URL would resolve to
+            // nothing and the logo would vanish from every PDF.
+            'logoDataUri' => $this->logos->dataUri($invoice->business_snapshot['logo_path'] ?? null),
         ], $extra))->render();
     }
 

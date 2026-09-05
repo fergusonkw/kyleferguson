@@ -9,19 +9,28 @@ use App\Http\Requests\Billing\StoreBusinessRequest;
 use App\Http\Requests\Billing\UpdateBusinessRequest;
 use App\Models\Billing\Business;
 use App\Services\AuditLogger;
+use App\Services\Billing\BusinessLogoStore;
+use App\Services\Billing\InvoiceTemplateRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 final class BusinessController extends Controller
 {
-    public function __construct(private readonly AuditLogger $audit) {}
+    public function __construct(
+        private readonly AuditLogger $audit,
+        private readonly BusinessLogoStore $logos,
+        private readonly InvoiceTemplateRegistry $templates,
+    ) {}
 
     public function index(): View
     {
         $this->authorize('viewAny', Business::class);
 
-        return view('admin-v2.billing.businesses.index');
+        return view('admin-v2.billing.businesses.index', [
+            'invoiceTemplates' => $this->templates->invoiceTemplates(),
+            'emailTemplates' => $this->templates->emailTemplates(),
+        ]);
     }
 
     public function data(Request $request): JsonResponse
@@ -72,6 +81,11 @@ final class BusinessController extends Controller
     public function store(StoreBusinessRequest $request): JsonResponse
     {
         $business = Business::create($request->validated());
+
+        if ($request->hasFile('logo')) {
+            $business->forceFill(['logo_path' => $this->logos->store($request->file('logo'))])->save();
+        }
+
         $this->audit->logCreated($business, ['billing', 'business']);
 
         return response()->json([
@@ -105,6 +119,10 @@ final class BusinessController extends Controller
                 'late_fee_terms' => $business->late_fee_terms,
                 'payment_terms_days' => $business->payment_terms_days,
                 'cheque_payable_to' => $business->cheque_payable_to,
+                'invoice_template_view' => $business->invoice_template_view,
+                'email_template_view' => $business->email_template_view,
+                'has_logo' => filled($business->logo_path),
+                'logo_preview' => $this->logos->dataUri($business->logo_path),
             ],
         ]);
     }
@@ -113,6 +131,15 @@ final class BusinessController extends Controller
     {
         $original = $business->getOriginal();
         $business->update($request->validated());
+
+        // Uploads never overwrite, so an invoice that snapshotted the old path
+        // keeps rendering the logo it was issued with. The old file stays.
+        if ($request->hasFile('logo')) {
+            $business->forceFill(['logo_path' => $this->logos->store($request->file('logo'))])->save();
+        } elseif ($request->boolean('remove_logo')) {
+            $business->forceFill(['logo_path' => null])->save();
+        }
+
         $this->audit->logUpdated($business, $original, ['billing', 'business']);
 
         return response()->json([

@@ -75,6 +75,38 @@
                 <x-admin-v2.form.input name="brand_secondary_color" label="Secondary Color" placeholder="#9333ea" />
             </div>
 
+            <div class="mb-4">
+                <label for="logo" class="form-label">Logo</label>
+                <div class="flex items-center gap-3">
+                    <div id="logoPreviewWrap" class="hidden">
+                        <img id="logoPreview" alt="" class="max-h-12 max-w-32 border border-default-200 p-1 bg-white">
+                    </div>
+                    <input type="file" name="logo" id="logo" accept="image/png,image/jpeg,image/webp"
+                           class="form-input grow">
+                </div>
+                <label class="flex items-center gap-2 mt-2 hidden" id="removeLogoWrap">
+                    <input type="checkbox" name="remove_logo" value="1" class="form-checkbox">
+                    <span class="text-sm">Remove the current logo</span>
+                </label>
+                <p class="text-xs text-default-400 mt-1.5">
+                    Replaces the initials block on invoices. Embedded in each document, so keep it small —
+                    512&nbsp;KB max. Uploading a new one never alters invoices already issued.
+                </p>
+            </div>
+
+            <hr class="border-default-200 my-4">
+            <p class="text-xs font-semibold uppercase text-default-400 tracking-wider mb-3">Templates</p>
+            <div class="grid grid-cols-2 gap-3">
+                <x-admin-v2.form.select name="invoice_template_view" label="Invoice Template"
+                    :options="$invoiceTemplates" :placeholder="null" :required="true" />
+                <x-admin-v2.form.select name="email_template_view" label="Client Email Template"
+                    :options="$emailTemplates" :placeholder="null" :required="true" />
+            </div>
+            <p class="text-xs text-default-400 -mt-2 mb-3">
+                Each invoice records the template it was issued with, so changing these affects future
+                invoices only. Drop a new Blade file beside the default and it appears here.
+            </p>
+
             <hr class="border-default-200 my-4">
             <p class="text-xs font-semibold uppercase text-default-400 tracking-wider mb-3">Payment</p>
             <div class="grid grid-cols-2 gap-3">
@@ -114,23 +146,55 @@ document.addEventListener('DOMContentLoaded', function () {
     let dataTable = null;
     setTimeout(() => { dataTable = window.dataTable_businessesTable; }, 500);
 
+    function showLogo (dataUri) {
+        const wrap = document.getElementById('logoPreviewWrap');
+        const img = document.getElementById('logoPreview');
+        if (dataUri) {
+            img.src = dataUri;
+            wrap.classList.remove('hidden');
+        } else {
+            img.removeAttribute('src');
+            wrap.classList.add('hidden');
+        }
+        // Nothing to remove until there is a stored logo to remove.
+        document.getElementById('removeLogoWrap').classList.toggle('hidden', !dataUri);
+    }
+
     function resetForm () {
         document.getElementById('businessForm').reset();
         document.querySelectorAll('input[name="supported_currencies[]"]').forEach(cb => { cb.checked = false; });
+        document.getElementById('logo').value = '';
+        showLogo(null);
     }
 
     function populateForm (b) {
         document.getElementById('businessId').value = b.id;
         for (const k of ['name','legal_name','address','contact_email','notification_email','brand_primary_color',
             'brand_secondary_color','invoice_number_prefix','default_currency','fx_source','tax_registered_from',
-            'daily_reminder_time','late_fee_terms','payment_terms_days','cheque_payable_to']) {
+            'daily_reminder_time','late_fee_terms','payment_terms_days','cheque_payable_to',
+            'invoice_template_view','email_template_view']) {
             const el = document.querySelector(`[name="${k}"]`);
             if (el) el.value = b[k] ?? '';
         }
         document.querySelectorAll('input[name="supported_currencies[]"]').forEach(cb => {
             cb.checked = (b.supported_currencies || []).includes(cb.value);
         });
+        showLogo(b.logo_preview);
     }
+
+    document.getElementById('logo')?.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        // A chosen file supersedes the removal: uploading is not removing.
+        const removeBox = document.querySelector('input[name="remove_logo"]');
+        if (removeBox) removeBox.checked = false;
+        const reader = new FileReader();
+        reader.onload = () => {
+            document.getElementById('logoPreview').src = reader.result;
+            document.getElementById('logoPreviewWrap').classList.remove('hidden');
+        };
+        reader.readAsDataURL(file);
+    });
 
     document.getElementById('createBusinessBtn')?.addEventListener('click', () => {
         resetForm();
