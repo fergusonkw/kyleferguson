@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@a919ff576a94b0fd7ec15f090dd9cf16b76c2c0b
+        uses: shivammathur/setup-php@529ee057c4434195612e6712b010adc92893e0ef
         with:
           php-version: '8.3'
           coverage: none
@@ -53,7 +53,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@a919ff576a94b0fd7ec15f090dd9cf16b76c2c0b
+        uses: shivammathur/setup-php@529ee057c4434195612e6712b010adc92893e0ef
         with:
           php-version: '8.3'
           coverage: none
