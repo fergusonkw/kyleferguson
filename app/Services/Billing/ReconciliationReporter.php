@@ -6,8 +6,10 @@ namespace App\Services\Billing;
 
 use App\Enums\Billing\CostCategory;
 use App\Enums\Billing\CostProviderSlug;
+use App\Enums\Billing\InvoiceStatus;
 use App\Models\Billing\CostLineItem;
 use App\Models\Billing\CostProvider;
+use App\Models\Billing\InvoiceLine;
 use App\Models\Billing\ProviderResource;
 use App\Services\Billing\Dto\ReconciliationSummary;
 use Illuminate\Database\Eloquent\Builder;
@@ -56,6 +58,7 @@ final class ReconciliationReporter
             costGap: $gap,
             unattributedResourceCount: $this->unattributedResources($businessId)->count(),
             lineItemCount: $this->lineQuery($businessId, $period)->count(),
+            uninvoicedCost: $this->uninvoicedCost($businessId, $period),
         );
     }
 
@@ -111,6 +114,51 @@ final class ReconciliationReporter
             })
             ->sortByDesc('cost')
             ->values();
+    }
+
+    /**
+     * The `source_reference` values that a live invoice is currently billing
+     * for this business and period.
+     *
+     * Attribution says whose cost something is; this says whether anyone has
+     * been charged for it. An attributed cost with no invoice behind it is
+     * work done and not billed — the failure this system exists to catch — and
+     * it is invisible if the two are conflated.
+     *
+     * Returned as a set so a page of line items costs one query, not one each.
+     *
+     * @return SupportCollection<int, string>
+     */
+    public function billedReferences(int $businessId, string $period): SupportCollection
+    {
+        return InvoiceLine::query()
+            ->whereNotNull('source_reference')
+            ->where('source_reference', 'like', 'cost_line_items:%')
+            ->whereHas('invoice', fn (Builder $q): Builder => $q
+                ->where('business_id', $businessId)
+                ->where('period', $period)
+                ->where('status', '!=', InvoiceStatus::Void))
+            ->pluck('source_reference')
+            ->unique()
+            ->values();
+    }
+
+    /**
+     * Attributed cost for the period that no live invoice is billing.
+     */
+    public function uninvoicedCost(int $businessId, string $period): float
+    {
+        $billed = $this->billedReferences($businessId, $period);
+
+        return round(
+            $this->lineQuery($businessId, $period)
+                ->whereNotNull('project_id')
+                ->whereNotIn('category', CostCategory::nonAttributableValues())
+                ->get()
+                ->reject(fn (CostLineItem $line): bool => $billed->contains($line->invoiceSourceReference()))
+                ->sum(fn (CostLineItem $line): float => (float) $line->usdCostBasis()),
+            4,
+        );
     }
 
     /**

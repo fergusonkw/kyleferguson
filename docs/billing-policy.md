@@ -32,6 +32,7 @@ DO billing ingestion is **not built in v1**. Laravel Cloud is under consideratio
 - SMTP2GO exposes **no cost, invoice, or billing-amount API** — only usage (`/stats/email_cycle`: emails sent / remaining / plan allowance, cycle dates). Plans are flat monthly subscriptions.
 - The per-account monthly fee is therefore **operator-configured** (`monthly_fee`, `fee_currency` — USD today) on the cost provider, not synced. It is entered **all-in** (whatever SMTP2GO actually charges, including any tax they add); while the business is unregistered that tax is a cost input absorbed by markup, consistent with the DO tax treatment above. `/stats/email_cycle` is still pulled and stored each period as usage evidence and to drive an over-quota warning.
 - The fee is recognised once per calendar-month billing period at 1×. SMTP2GO's rolling cycle dates are stored for context only; they do not shift which period the charge lands in.
+- Usage keeps refreshing after a period closes. A cycle anchored mid-month overlaps two periods, so every daily sync writes the current cycle's usage onto **each period it overlaps** — including a closed, already-invoiced one. Only the usage (description, metadata, payload link) moves; the period's charged amount is never rewritten by this refresh, and the issued invoice is untouched. A period that has recorded usage from a cycle overlapping it never has that replaced by a later cycle that does not (which would reset a finished month to the next cycle's near-zero count).
 - Because the account maps to a client, the SMTP2GO cost **is client-attributable** (not overhead). It attributes to one of that client's projects and takes that project's markup like any other cost. A synthetic "subscription" resource represents the account and is assigned to a project through the normal effective-dated `resource_assignments` mechanism; it auto-assigns when the client has exactly one active project.
 
 ## Currency
@@ -43,17 +44,22 @@ DO billing ingestion is **not built in v1**. Laravel Cloud is under consideratio
 
 ## Tax
 
-Tax registration status is tracked **per business**. Each business has its own $30K threshold and its own `tax_registered_from` date. As of v1, no business is GST/HST registered.
+Tax registration status is tracked **per legal entity**, not per business. A business is a trade name; GST/HST belongs to the person or corporation behind it (`legal_entities`), so every business under an entity shares one `tax_registered_from` date and one $30K small-supplier threshold. Today every business is a trade name of one sole proprietor. When Tracker Pull is split into a corporation, add it as a second legal entity, move the business onto it, and mark the two as **associated**. As modelled here, supplies of associated entities (e.g. a corporation its owner controls) are added together for the threshold even though each registers separately — confirm which entities are associated with an accountant. As of v1, no entity is GST/HST registered.
 
 While unregistered:
 
 - Client invoices show **no tax line**. Subtotal equals total.
 - DO's GST/HST charged on services to the business is **not recoverable** (no ITC available). It is treated as a cost input: `(DO USD cost + DO USD tax) → convert to CAD → apply markup`. The client sees one rolled-up hosting figure; DO's tax is invisibly absorbed by markup.
-- The system tracks **trailing 12-month revenue** and surfaces a warning on the dashboard as revenue approaches $30K, with sufficient lead time to register before crossing the CRA's 4-consecutive-quarters threshold.
+- The system tracks the **small-supplier threshold** per legal entity (with its associates) and warns before it is crossed:
+  - It trips on **either** test: more than $30,000 in a single calendar quarter, or more than $30,000 across four consecutive calendar quarters. The dashboard shows the four-quarter window ending with the current quarter, and also treats the window ending last quarter as tripped, so a quarter rolling over does not hide a threshold already passed.
+  - A supply counts on its invoice's `issued_on` date (set at approval), for invoices that are approved, sent, partially paid or paid. Drafts and voided invoices do not count.
+  - Its value is fixed in CAD at approval (`invoices.supply_value_cad`): the sum of billable lines excluding **credit** lines (a carried-forward overpayment settles money already received; it does not reduce the supply). Discounts and adjustments do reduce it. A non-CAD invoice converts at the Bank of Canada monthly average for the invoice's period — the same source the invoice itself uses. If that rate is not available at approval, the approval still goes through and the value is filled in by the daily check.
+  - Each entity has a configurable warning percentage (default 80%). `SmallSupplierThresholdAlertJob` runs daily at 08:15 and emails the operator once on reaching the warning level and once more on passing the threshold. A level that falls back re-arms the alert.
+  - Only invoices issued through this system are counted. Revenue earned elsewhere is not included.
 
 The schema anticipates the future transition:
 
-- A `tax_registered_from` date lives on the business configuration.
+- A `tax_registered_from` date lives on the legal entity.
 - Invoice generation branches on whether the invoice date falls before or after that date.
 - Past invoices remain immutable and correct regardless of future registration.
 
@@ -65,9 +71,11 @@ After registration (future state, not implemented in v1):
 ## Markup
 
 - Markup is configured **per project**, not per client.
-- A client-level default exists; new projects inherit it but can be overridden.
+- A client-level default exists; projects inherit it unless they override it. A project overrides type *and* values together — there is no partial inheritance.
 - Supported markup types: `percent`, `fixed_fee`, `hybrid` (fee + percent), `passthrough` (cost only).
-- Markup is applied to the CAD cost basis (which already includes DO's tax while unregistered).
+- Markup is expressed as two components: `markup_value` is always the **percent** and `markup_fee` is always the **flat fee**. A type uses one, both, or neither, and the form only shows the components its type uses.
+- Markup applies to the **cost basis in the client's billing currency** — provider costs are converted first, then marked up, so markup is charged on what the work cost in the currency the client is billed in. The basis already includes the provider's tax while the business is unregistered.
+- Markup applies to **hosting lines only**. Recurring and manual lines are entered at the price charged, so applying markup to them would double-count the operator's own pricing decision.
 
 ## Invoice composition
 
@@ -79,8 +87,10 @@ A draft invoice is composed of:
 
 Rules:
 
-- DO-derived numbers are **not editable**. Corrections happen via separate adjustment lines so the audit trail is preserved.
+- Provider-derived numbers are **not editable**. Corrections happen via separate adjustment lines so the audit trail is preserved.
 - Sub-items are display-only; markup applies to the parent total, not per sub-item.
+- Any line may carry a free-text **description**, rendered under its title. A four-figure line needs to explain itself before a client can approve it for payment.
+- **A line may be priced in a currency the client is not billed in** — a domain renewal bought in USD on a CAD invoice. Recurring templates and manual lines both convert at the invoice period's rate, and the line keeps the original amount, its currency, and the rate applied, so the document shows its working ("USD 18.00 at 1.375") rather than asserting a converted figure. A rate that cannot be resolved refuses the line rather than guessing.
 - The invoice carries: client, billing period, FX rate used, line items, subtotal, total, status, timestamps.
 
 ## Approval workflow
@@ -143,7 +153,7 @@ The dashboard surfaces at minimum:
 
 - **Unattributed resources**: anything in a provider's default/holding project, in a project not mapped to a client, or a synthetic account resource (e.g. an SMTP2GO account) not yet assigned to a project.
 - **Cost gap**: provider-reported total billed this period vs. sum of client-attributed costs + overhead. Anything non-zero needs an explanation. Only meaningful once a provider with a cost API is connected — with SMTP2GO alone the "billed" figure is the operator-entered fee, so the gap is zero by construction and the tile shows `—`.
-- **Trailing 12-month revenue per business**: progress toward each business's $30K registration threshold. *(Phase 3 — needs invoices.)*
+- **GST/HST small-supplier threshold per legal entity**: the four-quarter and current-quarter totals against $30K, across every business under the entity and its associates (see § Tax).
 - **Pending drafts**: invoices awaiting approval, oldest first. *(Phase 3.)*
 
 ## Provider abstraction

@@ -24,6 +24,8 @@ final class UpdateCostProviderRequest extends FormRequest
     {
         return [
             'display_name' => ['required', 'string', 'max:255'],
+            'invoice_label' => ['nullable', 'string', 'max:255'],
+            'invoice_description' => ['nullable', 'string', 'max:2000'],
             'enabled' => ['nullable', 'boolean'],
             'token' => ['nullable', 'string', 'min:32', 'max:512'],
 

@@ -43,6 +43,8 @@ final class AuthController extends Controller
      */
     public function login(Request $request): RedirectResponse
     {
+        $this->normalizeEmail($request);
+
         $credentials = $request->validate([
             'email' => ['required', 'email'],
             'password' => ['required'],
@@ -135,6 +137,8 @@ final class AuthController extends Controller
      */
     public function sendResetLink(Request $request): RedirectResponse
     {
+        $this->normalizeEmail($request);
+
         $request->validate(['email' => ['required', 'email']]);
 
         $status = Password::sendResetLink(
@@ -168,6 +172,8 @@ final class AuthController extends Controller
      */
     public function resetPassword(Request $request): RedirectResponse
     {
+        $this->normalizeEmail($request);
+
         $request->validate([
             'token' => ['required'],
             'email' => ['required', 'email'],
@@ -198,5 +204,17 @@ final class AuthController extends Controller
         return $status === Password::PASSWORD_RESET
             ? redirect()->route('login')->with('status', __($status))
             : back()->withErrors(['email' => [__($status)]]);
+    }
+
+    /**
+     * Emails are stored lowercase (see User::email()), so match that before
+     * any lookup — a phone keyboard capitalising the first letter must not
+     * lock anyone out.
+     */
+    private function normalizeEmail(Request $request): void
+    {
+        if (is_string($request->input('email'))) {
+            $request->merge(['email' => Str::lower(trim($request->input('email')))]);
+        }
     }
 }

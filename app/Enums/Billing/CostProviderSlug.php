@@ -31,6 +31,19 @@ enum CostProviderSlug: string
     }
 
     /**
+     * What this provider's costs are called on a client invoice, before the
+     * operator overrides it. A client reads the service they received, not the
+     * vendor supplying it, so these are plainer than the provider's own name.
+     */
+    public function defaultInvoiceLabel(): string
+    {
+        return match ($this) {
+            self::DigitalOcean => 'Hosting',
+            self::Smtp2go => 'Email delivery',
+        };
+    }
+
+    /**
      * Account-per-client providers carry a `client_id` and attribute their whole
      * charge to that client. Account-per-business providers attribute per resource.
      */

@@ -6,12 +6,16 @@ namespace App\Http\Requests\Billing;
 
 use App\Enums\Billing\ClientStatus;
 use App\Enums\Billing\MarkupType;
+use App\Http\Requests\Billing\Concerns\ValidatesMarkup;
 use Closure;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 final class UpdateClientRequest extends FormRequest
 {
+    use ValidatesMarkup;
+
     public function authorize(): bool
     {
         return $this->user()->can('update', $this->route('client'));
@@ -39,8 +43,16 @@ final class UpdateClientRequest extends FormRequest
             ],
             'status' => ['required', Rule::enum(ClientStatus::class)],
             'default_markup_type' => ['required', Rule::enum(MarkupType::class)],
-            'default_markup_value' => ['required', 'numeric', 'min:0'],
+            'default_markup_value' => ['nullable', 'numeric', 'min:0'],
+            'default_markup_fee' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(fn (Validator $v) => $this->validateMarkupComponents(
+            $v, $this->input('default_markup_type'), 'default_markup_value', 'default_markup_fee',
+        ));
     }
 }

@@ -49,6 +49,15 @@
                 :options="\App\Enums\Billing\CostProviderSlug::options()"
             />
             <x-admin-v2.form.input name="display_name" label="Display Name" :required="true" placeholder="DigitalOcean (Production)" />
+            <p class="text-xs text-default-400 -mt-2 mb-3">Your name for this account. Never shown to clients.</p>
+
+            <x-admin-v2.form.input name="invoice_label" label="Invoice Label" placeholder="Hosting" />
+            <x-admin-v2.form.textarea name="invoice_description" label="Invoice Description" rows="2"
+                                      placeholder="Optional. Shown under the line on the client's invoice." />
+            <p class="text-xs text-default-400 -mt-2 mb-3">
+                What the client reads — the service they received, not the vendor behind it.
+                Leave the label blank to use the provider's default.
+            </p>
             <x-admin-v2.form.input name="token" type="password" label="API Token" placeholder="dop_v1_..." />
             <p class="text-xs text-default-400 -mt-2 mb-3" id="tokenHint">
                 Read-only DigitalOcean Personal Access Token. Required when creating;
@@ -184,6 +193,8 @@ document.addEventListener('DOMContentLoaded', function () {
             slugSelect.value = p.slug;
             await applyProviderFields(p.slug);
             document.querySelector('input[name="display_name"]').value = p.display_name;
+            document.querySelector('input[name="invoice_label"]').value = p.invoice_label ?? '';
+            document.querySelector('textarea[name="invoice_description"]').value = p.invoice_description ?? '';
             document.querySelector('input[name="enabled"]').checked = p.enabled;
             document.querySelector('input[name="token"]').required = false;
             if (p.client_id) clientSelect.value = p.client_id;

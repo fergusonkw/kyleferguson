@@ -26,6 +26,8 @@ final class StoreCostProviderRequest extends FormRequest
             'business_id' => ['required', 'integer', 'exists:businesses,id'],
             'slug' => ['required', Rule::enum(CostProviderSlug::class)],
             'display_name' => ['required', 'string', 'max:255'],
+            'invoice_label' => ['nullable', 'string', 'max:255'],
+            'invoice_description' => ['nullable', 'string', 'max:2000'],
             'token' => ['required', 'string', 'min:32', 'max:512'],
             'enabled' => ['nullable', 'boolean'],
 

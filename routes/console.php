@@ -3,13 +3,17 @@
 declare(strict_types=1);
 
 use App\Jobs\Billing\AttributeCostsJob;
+use App\Jobs\Billing\DraftReminderDigestJob;
 use App\Jobs\Billing\FetchFxRateJob;
+use App\Jobs\Billing\GenerateMonthlyDraftsJob;
 use App\Jobs\Billing\ReconciliationAlertJob;
+use App\Jobs\Billing\SmallSupplierThresholdAlertJob;
 use App\Jobs\Billing\SyncProviderBillingJob;
 use App\Jobs\QueueHeartbeat;
 use App\Models\Billing\Business;
 use App\Models\Billing\Client;
 use App\Models\Billing\CostProvider;
+use App\Models\Billing\LegalEntity;
 use App\Services\Billing\BillingPeriod;
 use App\Services\Billing\ProviderAdapterRegistry;
 use Illuminate\Foundation\Inspiring;
@@ -89,6 +93,30 @@ Schedule::call(function (): void {
         ->each(fn (string $currency) => FetchFxRateJob::dispatch('USD', mb_strtoupper($currency), $period));
 })->monthlyOn(1, '01:00')->name('billing:fetch-fx-rates')->withoutOverlapping();
 
+// Build the closed month's drafts once cost ingestion, attribution and FX
+// have all had their run. Nothing reaches a client without approval.
+Schedule::call(function (): void {
+    $period = BillingPeriod::previous();
+
+    Business::query()->each(function (Business $business) use ($period): void {
+        GenerateMonthlyDraftsJob::dispatch($business->id, $period);
+    });
+})->monthlyOn(1, '06:00')->name('billing:generate-monthly-drafts')->withoutOverlapping();
+
+// Chase drafts that have sat unapproved for more than a day. Each business is
+// nudged at the hour it chose.
+Schedule::call(function (): void {
+    $hourNow = now()->format('H');
+
+    Business::query()->each(function (Business $business) use ($hourNow): void {
+        // Stored as a `time` string ("08:00:00"); only the hour is compared,
+        // since this check itself only runs on the hour.
+        if (mb_substr((string) $business->daily_reminder_time, 0, 2) === $hourNow) {
+            DraftReminderDigestJob::dispatch($business->id);
+        }
+    });
+})->hourlyAt(0)->name('billing:draft-reminders')->withoutOverlapping();
+
 // Alert the operator about anything that could not be accounted for. Silent
 // when a period reconciles cleanly.
 Schedule::call(function (): void {
@@ -98,3 +126,11 @@ Schedule::call(function (): void {
         ReconciliationAlertJob::dispatch($business->id, $period);
     });
 })->daily()->at('08:00')->name('billing:reconciliation-alert')->withoutOverlapping();
+
+// Watch each legal entity against the GST/HST small-supplier threshold. Emails
+// only when the level worsens, so a steady state stays quiet.
+Schedule::call(function (): void {
+    LegalEntity::query()->each(function (LegalEntity $entity): void {
+        SmallSupplierThresholdAlertJob::dispatch($entity->id);
+    });
+})->daily()->at('08:15')->name('billing:small-supplier-threshold')->withoutOverlapping();

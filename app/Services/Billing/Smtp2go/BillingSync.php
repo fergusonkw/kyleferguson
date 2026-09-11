@@ -73,6 +73,8 @@ final class BillingSync implements BillingSyncAdapter, CredentialValidator
                 usdAmount: $usdAmount,
             );
 
+            $this->refreshUsageOnOtherCoveredPeriods($provider, $resource, $period, $data, $cycle);
+
             $provider->markSyncSucceeded();
 
             return 1;
@@ -216,35 +218,94 @@ final class BillingSync implements BillingSyncAdapter, CredentialValidator
         string $feeCurrency,
         float $usdAmount,
     ): void {
-        $lineHash = CostLineItem::makeLineHash([
+        $line = CostLineItem::query()->firstOrNew([
+            'cost_provider_id' => $provider->id,
+            'period' => $period,
+            'line_hash' => $this->lineHash($resource),
+        ]);
+
+        $line->fill([
+            'provider_resource_id' => $resource->id,
+            'category' => CostCategory::Email,
+            'source_amount' => $fee,
+            'source_currency' => $feeCurrency,
+            'usd_amount' => $usdAmount,
+            'usd_tax' => 0,
+            'source_reference' => 'smtp2go:subscription',
+            'derived_at' => now(),
+        ]);
+
+        // Once a cycle that actually overlaps the period has been recorded, a
+        // later cycle that does not must not replace it — that is the next
+        // cycle's usage, and it would reset a finished month to near zero.
+        $hasCoveringUsage = (bool) ($line->metadata['cycle_covers_period'] ?? false);
+
+        if (! $line->exists || ! $hasCoveringUsage || $cycle->coversPeriod($period)) {
+            $line->fill($this->usageAttributes($provider, $payload, $cycle, $period));
+        }
+
+        $line->save();
+    }
+
+    /**
+     * SMTP2GO cycles rarely line up with calendar months, so the current cycle
+     * usually also describes last month — already closed, and often already
+     * invoiced. Its usage keeps moving until the cycle ends, so each period the
+     * cycle overlaps is brought up to date. Only usage moves: what a period was
+     * charged is left exactly as it was billed.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function refreshUsageOnOtherCoveredPeriods(
+        CostProvider $provider,
+        ProviderResource $resource,
+        string $syncedPeriod,
+        array $data,
+        Smtp2goCycle $cycle,
+    ): void {
+        $lines = CostLineItem::query()
+            ->where('cost_provider_id', $provider->id)
+            ->where('line_hash', $this->lineHash($resource))
+            ->whereIn('period', $cycle->coveredPeriods())
+            ->where('period', '!=', $syncedPeriod)
+            ->get();
+
+        foreach ($lines as $line) {
+            $payload = $this->storePayload($provider, $line->period, $data, $cycle);
+
+            $line->update($this->usageAttributes($provider, $payload, $cycle, $line->period));
+        }
+    }
+
+    /**
+     * The usage half of a line: what it says about the cycle, and the payload
+     * that says it.
+     *
+     * @return array{source_payload_id: int, description: string, metadata: array<string, mixed>}
+     */
+    private function usageAttributes(
+        CostProvider $provider,
+        ProviderBillingPayload $payload,
+        Smtp2goCycle $cycle,
+        string $period,
+    ): array {
+        return [
+            'source_payload_id' => $payload->id,
+            'description' => $this->describe($provider, $cycle),
+            'metadata' => $cycle->toMetadata() + [
+                'cycle_covers_period' => $cycle->coversPeriod($period),
+                'over_quota' => $cycle->isOverQuota(),
+            ],
+        ];
+    }
+
+    private function lineHash(ProviderResource $resource): string
+    {
+        return CostLineItem::makeLineHash([
             'smtp2go',
             self::RESOURCE_TYPE,
             (string) $resource->id,
         ]);
-
-        CostLineItem::query()->updateOrCreate(
-            [
-                'cost_provider_id' => $provider->id,
-                'period' => $period,
-                'line_hash' => $lineHash,
-            ],
-            [
-                'provider_resource_id' => $resource->id,
-                'source_payload_id' => $payload->id,
-                'category' => CostCategory::Email,
-                'description' => $this->describe($provider, $cycle),
-                'source_amount' => $fee,
-                'source_currency' => $feeCurrency,
-                'usd_amount' => $usdAmount,
-                'usd_tax' => 0,
-                'source_reference' => 'smtp2go:subscription',
-                'metadata' => $cycle->toMetadata() + [
-                    'cycle_covers_period' => $cycle->coversPeriod($period),
-                    'over_quota' => $cycle->isOverQuota(),
-                ],
-                'derived_at' => now(),
-            ],
-        );
     }
 
     private function describe(CostProvider $provider, Smtp2goCycle $cycle): string

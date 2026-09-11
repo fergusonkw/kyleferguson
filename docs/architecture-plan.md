@@ -15,7 +15,9 @@ Companion to [`billing-policy.md`](billing-policy.md). The policy doc captures r
 
 ### Business & identity
 
-- **`businesses`** — name, legal_name, address, contact_email, logo_path, brand_primary_color, brand_secondary_color, invoice_template_view, email_template_view, invoice_number_prefix, invoice_number_sequence, default_currency, supported_currencies (JSON), fx_source, tax_registered_from (nullable), notification_email, daily_reminder_time, late_fee_terms (free text shown on invoice footer)
+- **`legal_entities`** — name, entity_type (sole_proprietorship / corporation / partnership), tax_registered_from (nullable), threshold_warning_percent, threshold_alert_level, threshold_alerted_at. The person or corporation behind one or more businesses; owns GST/HST registration and the small-supplier threshold. **`legal_entity_associations`** pairs associated entities (stored both ways) whose supplies are counted together.
+- **`business_logos`** — mime_type, contents_base64, sha256, byte_size. Logos live in the database, not on disk (an ephemeral host would lose them). Write-once: a new upload adds a row, and invoice snapshots hold the `logo_id` they were issued with.
+- **`businesses`** — legal_entity_id, name, legal_name, address, contact_email, logo_id (FK → `business_logos`), brand_primary_color, brand_secondary_color, invoice_template_view, email_template_view, invoice_number_prefix, invoice_number_sequence, default_currency, supported_currencies (JSON), fx_source, notification_email, daily_reminder_time, late_fee_terms (free text shown on invoice footer)
 - **`clients`** — business_id, name, contact_name, contact_email, billing_address, billing_currency (defaults to business default; constrained to business's supported_currencies), status, default_markup_type, default_markup_value, notes
 - **`projects`** — client_id, name, do_project_uuid (nullable), markup_type (nullable → falls back to client), markup_value (nullable), status, terminated_at
 
@@ -37,7 +39,8 @@ Companion to [`billing-policy.md`](billing-policy.md). The policy doc captures r
 
 ### Invoicing
 
-- **`invoices`** — business_id, client_id, invoice_number, period_start, period_end, status (`draft|approved|sent|partially_paid|paid|void`), issue_currency (e.g. `CAD`, `USD`), subtotal, total, fx_rate_snapshot (rate from USD costs → issue_currency), fx_rate_source, fx_rate_period, template_view_snapshot, email_template_view_snapshot, late_fee_terms_snapshot, approved_at, sent_at, voided_at, pdf_path, hosted_view_token
+- **`invoices`** — business_id, client_id, invoice_number, period_start, period_end, status (`draft|approved|sent|partially_paid|paid|void`), issue_currency (e.g. `CAD`, `USD`), subtotal, total, fx_rate_snapshot (rate from USD costs → issue_currency), fx_rate_source, fx_rate_period, template_view_snapshot, email_template_view_snapshot, late_fee_terms_snapshot, approved_at, sent_at, voided_at, hosted_view_token, supply_value_cad
+- **`invoice_documents`** — invoice_id, reason (`approved|resent`), html. The invoice exactly as issued: fully rendered, self-contained HTML (fonts, logo, CSS inlined) captured at approval and on every resend, never edited. Replaces stored PDF files.
 - **`invoice_lines`** — invoice_id, parent_id (nullable), project_id (nullable), label, line_type (`hosting|recurring|manual|adjustment|discount|credit`), amount (in invoice's `issue_currency`), source_reference (nullable, e.g. `cost_line_items:123`), display_order
 - **`recurring_line_templates`** — client_id (nullable) or project_id (nullable), label, amount, currency (must match the client's billing_currency at apply time, else surfaced as a config error), cadence, active_from, active_to (nullable)
 
@@ -75,7 +78,7 @@ Companion to [`billing-policy.md`](billing-policy.md). The policy doc captures r
 
 - **`InvoiceBuilder`** — for a given (business, client, period): determines the issue currency (from client.billing_currency) → looks up FX rate (USD cost basis → issue currency) → aggregates attributed costs by project → applies project's markup → adds recurring line templates active during the period → renders the late-fee terms snapshot for the footer → creates `invoice` (draft) + `invoice_lines`. Idempotent on (business, client, period).
 - **`InvoiceApprover`** — handles status transitions (`draft → approved → sent`). Triggers PDF generation + email send. Refuses illegal transitions.
-- **`InvoicePdfRenderer`** — picks `template_view_snapshot` (or business default at issue time), renders to PDF with business branding (logo, colors), includes the late-fee terms snapshot in the footer, writes to storage, returns path.
+- **`InvoicePdfRenderer`** — picks `template_view_snapshot` (or business default at issue time), renders with business branding (logo, colors) and the late-fee terms snapshot. Writes nothing to disk: `freeze()` captures the issued document into `invoice_documents`; `pdf()` renders the current copy on request (payments since issue included); `issuedPdf()` renders the latest captured document, which is what the client email attaches.
 - **`PaymentRecorder`** — records/edits/voids payments. Recomputes invoice status. Writes to `AuditLog`.
 - **`InvoiceNumberAllocator`** — atomic per-business sequence with prefix.
 
@@ -182,28 +185,40 @@ Scope was refocused after Phase 1: DigitalOcean billing ingestion is **parked** 
 
 **Output:** Dashboard shows attributed SMTP2GO costs per client/project, surfaces unattributed accounts, no invoices yet. DO / Laravel Cloud billing drops in later as another `BillingSyncAdapter`.
 
-### Phase 3 — Invoice engine + payments
+### Phase 3 — Invoice engine + payments *(built)*
 
 - `invoices`, `invoice_lines`, `recurring_line_templates`, `payments` tables
 - `InvoiceBuilder`, `InvoiceApprover`, `InvoicePdfRenderer`, `PaymentRecorder`, `InvoiceNumberAllocator`
 - `GenerateMonthlyDraftsJob`, `DraftReminderDigestJob`
 - All four mailables (`InvoiceReadyForReview`, `InvoiceGenerationNeedsAttention`, `DraftReminderDigest`, `ClientInvoiceMail`)
-- Per-business invoice templates (existing `templates/invoice.html` becomes the default) with logo and brand colors
-- Per-business client email templates (Blade Mailables) sharing the same branding
-- Multi-currency support: invoice issued in client's `billing_currency`; FX from USD cost basis pulled per pair as needed
-- Late-fee terms rendered in invoice footer (free-text field on business, snapshotted onto invoice at generation)
-- Hosted invoice view (signed URL) with payment banner
+- Per-business invoice templates (`templates/invoice.html` ported to `admin-v2.billing.invoices.templates.default`) with brand colours
+- Per-business client email templates sharing the same branding
+- Multi-currency: invoice issued in the client's `billing_currency`; hosting costs converted from the USD basis, and **individual recurring or manual lines may be priced in another currency** and converted at the period's rate, keeping the source amount and rate for display
+- Late-fee terms and cheque payee snapshotted onto the invoice and rendered
+- Hosted invoice view with payment banner
 - Admin UI: invoice list/detail, edit manual lines, approve, send, record payment
 
 **Output:** End-to-end automated drafts → operator notifications → review → approve → send → track payments.
 
+Decisions taken during the build that departed from the original sketch:
+
+- **PDF rendering is Browsershot**, not a PHP renderer. `templates/invoice.html` is a print-optimised design using flexbox and grid; dompdf would have meant rewriting it as tables. Hosts therefore need Node plus the Puppeteer Chromium download, or `LARAVEL_PDF_CHROME_PATH` pointed at a system Chrome. Since PDFs are rendered on request, that applies to the web tier, not just a queue worker. On a host without Chromium, laravel-pdf's Cloudflare or Gotenberg driver (`LARAVEL_PDF_DRIVER`) is the fallback.
+- **No invoice files on disk** (changed 2026-09-11 for Laravel Cloud's ephemeral filesystem). PDFs are rendered on request; the record of what was sent is `invoice_documents`, and logos are `business_logos` rows. Admin downloads offer both the current copy and the as-issued one.
+- **Production renders through Cloudflare Browser Run** (`LARAVEL_PDF_DRIVER=cloudflare`). Its free plan allows one request every 10 seconds, so `AppServiceProvider` rebinds `laravel-pdf.driver.cloudflare` to `Pdf\RetryingCloudflareDriver`: a 429 is waited out (Cloudflare's `Retry-After`, else 10 s, capped at 15 s) for up to 3 attempts. A bad token and a spent daily allowance fail immediately. Tests pin `LARAVEL_PDF_DRIVER=browsershot` in `phpunit.xml`, so a suite run never calls Cloudflare.
+- **The hosted view is an unguessable token URL, not a Laravel signed URL.** A signed URL expires, which would break the link in an email the client keeps — and the durable, revocable thing is the token, which the schema already carried.
+- **The hosted page and the PDF are one render.** `InvoicePdfRenderer::html()` takes optional extra data; the hosted page passes a payment banner and download link, the PDF passes none. Two templates would have been free to drift.
+- **Markup is two components.** `markup_value` is always the percent and `markup_fee` always the flat fee, because `hybrid` needs both and Phase 1 gave markup a single column.
+- **Payment status is derived, never chosen.** `InvoiceStatus::allowedTransitions()` covers only operator moves; `isPaymentTracked()` governs payment-derived movement, so nothing can be marked paid without a payment record.
+
+~~Still open from this phase: fonts are fetched from Google Fonts at render time.~~ Resolved: the webfonts are vendored in `resources/fonts` and inlined by `InvoiceFontStore`.
+
 ### Phase 4 — Polish
 
-- `RestatementDetector` + `DetectBillingRestatementsJob`
-- Trailing-12mo threshold tracking with configurable warning percentage
-- Overpayment-to-credit logic in `InvoiceBuilder`
-- Recurring line template UI
-- Placeholder hooks for future Stripe / Interac payment integration
+- `RestatementDetector` + `DetectBillingRestatementsJob` — **deferred**; no connected provider restates prior periods (SMTP2GO is a flat fee)
+- ~~Trailing-12mo threshold tracking with configurable warning percentage~~ — **built** as small-supplier threshold tracking per **legal entity** (not per business): `legal_entities` + `legal_entity_associations`, `businesses.legal_entity_id`, `tax_registered_from` moved from businesses to legal entities, `invoices.supply_value_cad` fixed at approval, `SmallSupplierThreshold` service, `SmallSupplierThresholdAlertJob` (daily 08:15) + `SmallSupplierThresholdAlert` mail, `/admin/billing/legal-entities`, dashboard card. Tests `CheckpointG1`, `G2`. Rules in billing-policy.md § Tax.
+- ~~Overpayment-to-credit logic in `InvoiceBuilder`~~ — **built** in Phase 3 (`addCarriedCredits`)
+- ~~Recurring line template UI~~ — **built** (`RecurringLineTemplateController`)
+- Placeholder hooks for future Stripe / Interac payment integration — **deferred** until there is an integration to build against
 
 ## Deferred to later phases
 

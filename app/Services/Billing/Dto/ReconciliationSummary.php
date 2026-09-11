@@ -19,6 +19,12 @@ final readonly class ReconciliationSummary
         public ?float $costGap = null,
         public int $unattributedResourceCount = 0,
         public int $lineItemCount = 0,
+
+        /**
+         * Attributed cost no live invoice is billing. Distinct from
+         * unattributed: we know whose cost it is, nobody has been charged.
+         */
+        public float $uninvoicedCost = 0.0,
     ) {}
 
     public function totalIngestedCost(): float

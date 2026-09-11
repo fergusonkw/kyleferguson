@@ -87,6 +87,8 @@ final class CostProviderController extends Controller
             'client_id' => $validated['client_id'] ?? null,
             'slug' => $slug,
             'display_name' => $validated['display_name'],
+            'invoice_label' => $validated['invoice_label'] ?? null,
+            'invoice_description' => $validated['invoice_description'] ?? null,
             'credentials' => [$this->credentialKeyFor($slug) => $validated['token']],
             'config' => $request->configPayload(),
             'enabled' => (bool) ($validated['enabled'] ?? true),
@@ -120,6 +122,8 @@ final class CostProviderController extends Controller
                 'slug' => $costProvider->slug->value,
                 'account_per_client' => $costProvider->slug->isAccountPerClient(),
                 'display_name' => $costProvider->display_name,
+                'invoice_label' => $costProvider->invoice_label,
+                'invoice_description' => $costProvider->invoice_description,
                 'enabled' => $costProvider->enabled,
                 'region' => $costProvider->config('region'),
                 'monthly_fee' => $costProvider->config('monthly_fee'),
@@ -140,6 +144,8 @@ final class CostProviderController extends Controller
 
         $costProvider->fill([
             'display_name' => $validated['display_name'],
+            'invoice_label' => $validated['invoice_label'] ?? null,
+            'invoice_description' => $validated['invoice_description'] ?? null,
             'enabled' => (bool) ($validated['enabled'] ?? false),
             'config' => $request->configPayload(),
         ]);

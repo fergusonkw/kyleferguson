@@ -35,7 +35,44 @@
         </x-admin-v2.card>
     @endisset
 
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 mt-5">
+    @isset($receivables)
+        <div class="flex items-center justify-between mt-8 mb-3">
+            <h5 class="text-sm font-semibold text-default-500 uppercase">Money owed</h5>
+            <a href="{{ route('admin.billing.receivables.index') }}" class="text-sm text-primary">Receivables →</a>
+        </div>
+
+        @if($receivables->hasOverdue())
+            <x-admin-v2.alert
+                type="danger"
+                message="{{ $receivables->overdueCount }} invoice(s) are past due, the oldest by {{ $receivables->oldestOverdueDays }} days."
+            />
+        @elseif($receivables->awaitingSendCount > 0)
+            <x-admin-v2.alert
+                type="warning"
+                message="{{ $receivables->awaitingSendCount }} approved invoice(s) have not been sent to the client yet."
+            />
+        @endif
+
+        <x-admin-v2.billing.receivable-cards :summary="$receivables" />
+    @endisset
+
+    @isset($threshold)
+        <x-admin-v2.billing.threshold-card :assessment="$threshold" />
+    @endisset
+
+    @if(isset($currentBusiness) && $currentBusiness->legal_entity_id === null)
+        <x-admin-v2.alert
+            type="warning"
+            class="mt-8"
+            message="{{ $currentBusiness->name }} has no legal entity, so the GST/HST threshold is not being tracked for it. Set one on the business."
+        />
+    @endif
+
+    <div class="flex items-center justify-between mt-8 mb-3">
+        <h5 class="text-sm font-semibold text-default-500 uppercase">Configuration</h5>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
         <x-admin-v2.stat-card
             title="Businesses"
             icon="briefcase-business"
@@ -114,8 +151,8 @@
         @if($trailingCost->isNotEmpty())
             <x-admin-v2.card title="Trailing 12-month cost" class="mt-5">
                 <p class="text-sm text-default-500 mb-4">
-                    Ingested cost basis per period. The trailing-revenue gauge against the $30K
-                    registration threshold arrives with invoicing.
+                    Ingested cost basis per period, in USD. This is what the work cost, not what was
+                    billed — revenue against the GST/HST threshold is tracked above.
                 </p>
                 <div class="overflow-x-auto">
                     <div class="flex items-end gap-2 min-w-[480px] h-32">
