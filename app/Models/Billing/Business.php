@@ -7,16 +7,18 @@ namespace App\Models\Billing;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property int $id
+ * @property int|null $legal_entity_id
  * @property string $name
  * @property string|null $legal_name
  * @property string|null $address
  * @property string $contact_email
  * @property string|null $cheque_payable_to
- * @property string|null $logo_path
+ * @property int|null $logo_id
  * @property string|null $brand_primary_color
  * @property string|null $brand_secondary_color
  * @property string $invoice_template_view
@@ -26,13 +28,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $default_currency
  * @property array<int, string>|null $supported_currencies
  * @property string $fx_source
- * @property \Illuminate\Support\Carbon|null $tax_registered_from
  * @property string $notification_email
  * @property string $daily_reminder_time
  * @property string|null $late_fee_terms
  * @property int $payment_terms_days
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read LegalEntity|null $legalEntity
+ * @property-read BusinessLogo|null $logo
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Client> $clients
  * @property-read \Illuminate\Database\Eloquent\Collection<int, CostProvider> $costProviders
  *
@@ -47,12 +50,13 @@ final class Business extends Model
 
     /** @var list<string> */
     protected $fillable = [
+        'legal_entity_id',
         'name',
         'legal_name',
         'address',
         'contact_email',
         'cheque_payable_to',
-        'logo_path',
+        'logo_id',
         'brand_primary_color',
         'brand_secondary_color',
         'invoice_template_view',
@@ -62,12 +66,33 @@ final class Business extends Model
         'default_currency',
         'supported_currencies',
         'fx_source',
-        'tax_registered_from',
         'notification_email',
         'daily_reminder_time',
         'late_fee_terms',
         'payment_terms_days',
     ];
+
+    /**
+     * The person or corporation this business trades under. Registration and
+     * the small-supplier threshold are theirs, not the trade name's.
+     *
+     * @return BelongsTo<LegalEntity, $this>
+     */
+    public function legalEntity(): BelongsTo
+    {
+        return $this->belongsTo(LegalEntity::class);
+    }
+
+    /**
+     * The current logo. Replacing it points here at a new row; the old one
+     * stays, for the invoices that were issued with it.
+     *
+     * @return BelongsTo<BusinessLogo, $this>
+     */
+    public function logo(): BelongsTo
+    {
+        return $this->belongsTo(BusinessLogo::class, 'logo_id');
+    }
 
     /** @return HasMany<Client, $this> */
     public function clients(): HasMany
@@ -88,15 +113,11 @@ final class Business extends Model
     }
 
     /**
-     * Whether the business is currently GST/HST registered as of $on.
+     * Whether the business's legal entity is GST/HST registered as of $on.
      */
     public function isTaxRegisteredOn(DateTimeInterface $on): bool
     {
-        if ($this->tax_registered_from === null) {
-            return false;
-        }
-
-        return $this->tax_registered_from->lessThanOrEqualTo($on);
+        return $this->legalEntity?->isTaxRegisteredOn($on) ?? false;
     }
 
     /**
@@ -106,7 +127,6 @@ final class Business extends Model
     {
         return [
             'supported_currencies' => 'array',
-            'tax_registered_from' => 'date',
             'invoice_number_sequence' => 'integer',
         ];
     }

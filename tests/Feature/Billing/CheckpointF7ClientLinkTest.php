@@ -16,6 +16,7 @@ use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Spatie\LaravelPdf\Facades\Pdf;
 use Tests\TestCase;
 
 /**
@@ -55,7 +56,7 @@ final class CheckpointF7ClientLinkTest extends TestCase
 
     public function test_the_hosted_pdf_forbids_sending_its_address_onward(): void
     {
-        $invoice = $this->invoiceWithStoredPdf(InvoiceStatus::Sent);
+        $invoice = $this->invoiceWithFakedPdf(InvoiceStatus::Sent);
 
         $this->get(route('invoices.hosted.pdf', $invoice->hosted_view_token))
             ->assertOk()
@@ -136,7 +137,7 @@ final class CheckpointF7ClientLinkTest extends TestCase
     public function test_replacing_the_link_changes_nothing_else_about_the_invoice(): void
     {
         $invoice = $this->invoice(InvoiceStatus::Sent);
-        $invoice->forceFill(['sent_at' => now()->subDay(), 'pdf_path' => 'invoices/1/x.pdf'])->save();
+        $invoice->forceFill(['sent_at' => now()->subDay()])->save();
         $before = $invoice->fresh();
 
         $this->actingAs($this->createAdmin())
@@ -148,7 +149,6 @@ final class CheckpointF7ClientLinkTest extends TestCase
         $this->assertSame($before->invoice_number, $after->invoice_number);
         $this->assertSame($before->status, $after->status);
         $this->assertSame($before->total, $after->total);
-        $this->assertSame($before->pdf_path, $after->pdf_path);
         $this->assertTrue($before->sent_at->equalTo($after->sent_at));
     }
 
@@ -246,18 +246,14 @@ final class CheckpointF7ClientLinkTest extends TestCase
     }
 
     /**
-     * An invoice whose PDF is already on disk, so serving it does not drive
+     * An invoice whose PDF render is faked, so serving it does not drive
      * Chromium — the header is the subject here, not the render.
      */
-    private function invoiceWithStoredPdf(InvoiceStatus $status): Invoice
+    private function invoiceWithFakedPdf(InvoiceStatus $status): Invoice
     {
-        $invoice = $this->invoice($status);
-        $path = "invoices/{$this->business->id}/{$invoice->invoice_number}.pdf";
+        Pdf::fake();
 
-        Storage::disk('local')->put($path, '%PDF-1.4 stand-in');
-        $invoice->forceFill(['pdf_path' => $path])->save();
-
-        return $invoice->fresh();
+        return $this->invoice($status);
     }
 
     /**

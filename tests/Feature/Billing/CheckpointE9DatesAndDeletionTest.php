@@ -342,6 +342,7 @@ final class CheckpointE9DatesAndDeletionTest extends TestCase
     private function businessPayload(array $overrides = []): array
     {
         return array_merge([
+            'legal_entity_id' => $this->business->legal_entity_id,
             'name' => $this->business->name,
             'contact_email' => $this->business->contact_email,
             'notification_email' => $this->business->notification_email,

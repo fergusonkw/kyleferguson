@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Billing;
 
+use App\Enums\Billing\InvoiceDocumentReason;
 use App\Mail\Billing\ClientInvoiceMail;
 use App\Models\Billing\Invoice;
 use App\Services\AuditLogger;
@@ -63,11 +64,11 @@ final class InvoiceResender
             $invoice->forceFill(['due_on' => $dueOn->toDateString()])->save();
         }
 
-        // The stored PDF was rendered at approval and nothing since has
-        // refreshed it, so it can carry a due date or a balance that has since
-        // changed. Re-rendered from the same snapshotted template, so the
-        // document keeps its look and gains only what is true now.
-        $this->pdf->store($invoice->refresh());
+        // The document captured at approval can carry a due date or a balance
+        // that has since changed. A fresh capture, from the same snapshotted
+        // template, keeps its look and gains only what is true now — and the
+        // earlier capture stays, as the record of the first send.
+        $this->pdf->freeze($invoice->refresh(), InvoiceDocumentReason::Resent);
 
         Mail::to($recipient)->send(new ClientInvoiceMail($invoice));
 

@@ -10,6 +10,7 @@ use App\Jobs\Billing\SyncProviderResourcesJob;
 use App\Models\Billing\Business;
 use App\Models\Billing\Client;
 use App\Models\Billing\CostProvider;
+use App\Models\Billing\LegalEntity;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
@@ -253,6 +254,7 @@ final class CheckpointC2CrudTest extends TestCase
     private function adminPayload(array $overrides = []): array
     {
         return array_merge([
+            'legal_entity_id' => LegalEntity::query()->value('id') ?? LegalEntity::factory()->create()->id,
             'name' => 'Acme Hosting',
             'contact_email' => 'hello@acme.test',
             'notification_email' => 'invoices@acme.test',

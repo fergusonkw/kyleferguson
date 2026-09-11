@@ -30,7 +30,8 @@ final class CheckpointAFoundationTest extends TestCase
         $this->assertSame('CAD', $business->default_currency);
         $this->assertSame(['CAD', 'USD'], $business->supported_currencies);
         $this->assertSame('bank_of_canada', $business->fx_source);
-        $this->assertNull($business->tax_registered_from);
+        $this->assertNotNull($business->legalEntity);
+        $this->assertNull($business->legalEntity->tax_registered_from);
         $this->assertFalse($business->isTaxRegisteredOn(now()));
     }
 

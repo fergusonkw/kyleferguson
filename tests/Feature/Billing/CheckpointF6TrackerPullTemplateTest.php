@@ -354,7 +354,7 @@ final class CheckpointF6TrackerPullTemplateTest extends TestCase
             ->put(route('admin.billing.businesses.update', $this->business), $this->payload(['logo' => $svg]))
             ->assertOk();
 
-        $this->assertNotNull($this->business->fresh()->logo_path);
+        $this->assertNotNull($this->business->fresh()->logo_id);
 
         $html = $this->render($this->invoice());
 
@@ -402,14 +402,10 @@ final class CheckpointF6TrackerPullTemplateTest extends TestCase
         $invoice->forceFill(['subtotal' => 500, 'total' => 500])->save();
         InvoiceLine::factory()->for($invoice)->create(['label' => 'Season results tooling', 'amount' => 500]);
 
-        $path = app(InvoicePdfRenderer::class)->store($invoice->fresh());
-        $disk = Storage::disk('local');
+        $pdf = app(InvoicePdfRenderer::class)->pdf($invoice->fresh());
 
-        $this->assertTrue($disk->exists($path));
-        $this->assertStringStartsWith('%PDF-', (string) $disk->get($path));
-        $this->assertGreaterThan(1000, $disk->size($path));
-
-        $disk->delete($path);
+        $this->assertStringStartsWith('%PDF-', $pdf);
+        $this->assertGreaterThan(1000, strlen($pdf));
     }
 
     // ---- The client email --------------------------------------------------
@@ -648,6 +644,7 @@ final class CheckpointF6TrackerPullTemplateTest extends TestCase
     private function payload(array $overrides = []): array
     {
         return array_merge([
+            'legal_entity_id' => $this->business->legal_entity_id,
             'name' => $this->business->name,
             'contact_email' => $this->business->contact_email,
             'notification_email' => 'alerts@trackerpull.ca',

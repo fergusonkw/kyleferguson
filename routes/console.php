@@ -7,11 +7,13 @@ use App\Jobs\Billing\DraftReminderDigestJob;
 use App\Jobs\Billing\FetchFxRateJob;
 use App\Jobs\Billing\GenerateMonthlyDraftsJob;
 use App\Jobs\Billing\ReconciliationAlertJob;
+use App\Jobs\Billing\SmallSupplierThresholdAlertJob;
 use App\Jobs\Billing\SyncProviderBillingJob;
 use App\Jobs\QueueHeartbeat;
 use App\Models\Billing\Business;
 use App\Models\Billing\Client;
 use App\Models\Billing\CostProvider;
+use App\Models\Billing\LegalEntity;
 use App\Services\Billing\BillingPeriod;
 use App\Services\Billing\ProviderAdapterRegistry;
 use Illuminate\Foundation\Inspiring;
@@ -124,3 +126,11 @@ Schedule::call(function (): void {
         ReconciliationAlertJob::dispatch($business->id, $period);
     });
 })->daily()->at('08:00')->name('billing:reconciliation-alert')->withoutOverlapping();
+
+// Watch each legal entity against the GST/HST small-supplier threshold. Emails
+// only when the level worsens, so a steady state stays quiet.
+Schedule::call(function (): void {
+    LegalEntity::query()->each(function (LegalEntity $entity): void {
+        SmallSupplierThresholdAlertJob::dispatch($entity->id);
+    });
+})->daily()->at('08:15')->name('billing:small-supplier-threshold')->withoutOverlapping();

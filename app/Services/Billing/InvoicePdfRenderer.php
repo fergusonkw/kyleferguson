@@ -4,24 +4,34 @@ declare(strict_types=1);
 
 namespace App\Services\Billing;
 
+use App\Enums\Billing\InvoiceDocumentReason;
 use App\Models\Billing\Invoice;
+use App\Models\Billing\InvoiceDocument;
 use Illuminate\Contracts\View\Factory as ViewFactory;
-use Illuminate\Support\Facades\Storage;
-use RuntimeException;
 use Spatie\LaravelPdf\Facades\Pdf;
 
 /**
  * Renders an invoice to HTML and to PDF.
  *
+ * Nothing is written to disk. A PDF is rendered when it is asked for, and the
+ * durable record of what a client was sent is the issued HTML captured into
+ * `invoice_documents` — self-contained, so it reprints identically forever
+ * and is covered by the database's backups rather than by a filesystem a host
+ * may wipe on deploy.
+ *
+ * Two kinds of copy come out of here:
+ *
+ * - **Current** — rendered live from the invoice's snapshotted template and
+ *   data, so a client downloading after paying gets a copy stamped Paid.
+ * - **As issued** — the captured HTML, exactly what went out at approval or on
+ *   the latest resend. The invoice email attaches this one.
+ *
  * The template is whichever view the invoice snapshotted at generation time,
- * not the business's current one — reprinting a two-year-old invoice has to
- * produce the document the client actually received. The same render backs the
- * hosted view, so the web page and the PDF can never drift apart.
+ * not the business's current one. The same render backs the hosted view, so
+ * the web page and the current PDF can never drift apart.
  */
 final class InvoicePdfRenderer
 {
-    private const DISK = 'local';
-
     private const FALLBACK_TEMPLATE = 'admin-v2.billing.invoices.templates.default';
 
     public function __construct(
@@ -51,7 +61,7 @@ final class InvoicePdfRenderer
             // Inlined rather than linked: Browsershot renders from an HTML
             // string with no document base, so a relative URL would resolve to
             // nothing and the logo would vanish from every PDF.
-            'logoDataUri' => $this->logos->dataUri($invoice->business_snapshot['logo_path'] ?? null),
+            'logoDataUri' => $this->logos->dataUri($this->snapshotLogoId($invoice)),
 
             // Scoped to the template so an invoice carries only the faces it
             // sets its own text in, rather than every family the application
@@ -66,47 +76,42 @@ final class InvoicePdfRenderer
     }
 
     /**
-     * Render to PDF, store it, and record the path on the invoice.
-     * Returns the storage-relative path.
+     * Capture the document as it stands now — the record of what the client
+     * is being sent. Called at approval and on every resend; each capture is
+     * kept, so every send can be reproduced.
      */
-    public function store(Invoice $invoice): string
+    public function freeze(Invoice $invoice, InvoiceDocumentReason $reason): InvoiceDocument
     {
-        $path = $this->pathFor($invoice);
+        $document = $invoice->documents()->create([
+            'reason' => $reason,
+            'html' => $this->html($invoice),
+        ]);
 
-        Storage::disk(self::DISK)->makeDirectory(dirname($path));
+        $invoice->unsetRelation('issuedDocument');
 
-        Pdf::html($this->html($invoice))
-            ->format('letter')
-            ->margins(14, 14, 14, 14)
-            ->save(Storage::disk(self::DISK)->path($path));
-
-        $invoice->forceFill(['pdf_path' => $path])->save();
-
-        return $path;
+        return $document;
     }
 
     /**
-     * The stored PDF, rendering and storing it if it does not exist yet.
+     * The current copy: rendered now, showing payments received since.
      */
-    public function ensureStored(Invoice $invoice): string
+    public function pdf(Invoice $invoice): string
     {
-        if ($invoice->pdf_path !== null && Storage::disk(self::DISK)->exists($invoice->pdf_path)) {
-            return $invoice->pdf_path;
-        }
-
-        return $this->store($invoice);
+        return $this->toPdf($this->html($invoice));
     }
 
-    public function contents(Invoice $invoice): string
+    /**
+     * The copy the client was most recently sent. An invoice with nothing
+     * captured — issued before documents were kept — has only its current
+     * copy to offer.
+     */
+    public function issuedPdf(Invoice $invoice): string
     {
-        $path = $this->ensureStored($invoice);
-        $contents = Storage::disk(self::DISK)->get($path);
+        $document = $invoice->issuedDocument()->first();
 
-        if ($contents === null) {
-            throw new RuntimeException("Invoice PDF for {$invoice->invoice_number} could not be read back from storage.");
-        }
-
-        return $contents;
+        return $document !== null
+            ? $this->toPdf($document->html)
+            : $this->pdf($invoice);
     }
 
     public function downloadFilename(Invoice $invoice): string
@@ -114,13 +119,19 @@ final class InvoicePdfRenderer
         return $invoice->invoice_number.'.pdf';
     }
 
-    /**
-     * Invoices are grouped per business so one business's documents can be
-     * archived or handed over without touching another's.
-     */
-    private function pathFor(Invoice $invoice): string
+    private function toPdf(string $html): string
     {
-        return sprintf('invoices/%d/%s.pdf', $invoice->business_id, $invoice->invoice_number);
+        return Pdf::html($html)
+            ->format('letter')
+            ->margins(14, 14, 14, 14)
+            ->generatePdfContent();
+    }
+
+    private function snapshotLogoId(Invoice $invoice): ?int
+    {
+        $logoId = $invoice->business_snapshot['logo_id'] ?? null;
+
+        return is_numeric($logoId) ? (int) $logoId : null;
     }
 
     /**

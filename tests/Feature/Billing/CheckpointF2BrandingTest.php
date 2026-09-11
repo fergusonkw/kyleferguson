@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Billing;
 
 use App\Models\Billing\Business;
+use App\Models\Billing\BusinessLogo;
 use App\Models\Billing\Client;
 use App\Models\Billing\Invoice;
 use App\Services\Billing\InvoicePdfRenderer;
@@ -18,10 +19,10 @@ use Tests\TestCase;
 /**
  * Branding an operator could configure in the database but not in the app.
  *
- * The schema has carried `logo_path` and the two template columns since the
- * businesses table was created; nothing ever set them. These tests cover the
- * upload and the overrides, and — more importantly — the promise that neither
- * can retroactively change an invoice that has already been issued.
+ * These tests cover the logo upload and the template overrides, and — more
+ * importantly — the promise that neither can retroactively change an invoice
+ * that has already been issued. Logos live in the database, not on disk, so
+ * a host that wipes its filesystem on deploy cannot lose them.
  */
 final class CheckpointF2BrandingTest extends TestCase
 {
@@ -66,14 +67,15 @@ final class CheckpointF2BrandingTest extends TestCase
 
         $business = Business::where('name', 'Second Business')->sole();
 
-        $this->assertNotNull($business->logo_path);
-        Storage::disk('local')->assertExists($business->logo_path);
+        $this->assertNotNull($business->logo);
+        $this->assertSame('image/png', $business->logo->mime_type);
+        $this->assertSame([], Storage::disk('local')->allFiles(), 'Nothing should be written to disk.');
     }
 
-    public function test_replacing_a_logo_leaves_the_old_file_in_place(): void
+    public function test_replacing_a_logo_keeps_the_old_one(): void
     {
-        // Issued invoices snapshot the path they rendered with. Overwriting the
-        // file would silently restyle documents a client already holds.
+        // Issued invoices snapshot the logo they rendered with. Overwriting it
+        // would silently restyle documents a client already holds.
         $admin = $this->createAdmin();
 
         $this->actingAs($admin)
@@ -82,7 +84,7 @@ final class CheckpointF2BrandingTest extends TestCase
             ]))
             ->assertOk();
 
-        $first = $this->business->fresh()->logo_path;
+        $first = $this->business->fresh()->logo_id;
 
         $this->actingAs($admin)
             ->put(route('admin.billing.businesses.update', $this->business), $this->payload([
@@ -90,14 +92,14 @@ final class CheckpointF2BrandingTest extends TestCase
             ]))
             ->assertOk();
 
-        $second = $this->business->fresh()->logo_path;
+        $second = $this->business->fresh()->logo_id;
 
         $this->assertNotSame($first, $second);
-        Storage::disk('local')->assertExists($first);
-        Storage::disk('local')->assertExists($second);
+        $this->assertModelExists(BusinessLogo::find($first));
+        $this->assertModelExists(BusinessLogo::find($second));
     }
 
-    public function test_removing_a_logo_clears_the_business_but_keeps_the_file(): void
+    public function test_removing_a_logo_clears_the_business_but_keeps_the_logo(): void
     {
         $admin = $this->createAdmin();
 
@@ -107,7 +109,7 @@ final class CheckpointF2BrandingTest extends TestCase
             ]))
             ->assertOk();
 
-        $path = $this->business->fresh()->logo_path;
+        $logoId = $this->business->fresh()->logo_id;
 
         $this->actingAs($admin)
             ->put(route('admin.billing.businesses.update', $this->business), $this->payload([
@@ -115,8 +117,8 @@ final class CheckpointF2BrandingTest extends TestCase
             ]))
             ->assertOk();
 
-        $this->assertNull($this->business->fresh()->logo_path);
-        Storage::disk('local')->assertExists($path);
+        $this->assertNull($this->business->fresh()->logo_id);
+        $this->assertModelExists(BusinessLogo::find($logoId));
     }
 
     public function test_an_unknown_template_is_rejected(): void
@@ -181,12 +183,12 @@ final class CheckpointF2BrandingTest extends TestCase
             ->assertSee('class="brand-logo"', false);
     }
 
-    public function test_a_missing_logo_file_falls_back_to_the_monogram(): void
+    public function test_a_missing_logo_falls_back_to_the_monogram(): void
     {
         // Printing a plainer invoice beats failing to print one.
         $invoice = $this->invoiceWithLogo();
 
-        Storage::disk('local')->delete($this->business->fresh()->logo_path);
+        BusinessLogo::query()->whereKey($invoice->business_snapshot['logo_id'])->delete();
 
         $html = app(InvoicePdfRenderer::class)->html($invoice);
 
@@ -197,7 +199,7 @@ final class CheckpointF2BrandingTest extends TestCase
     public function test_an_invoice_keeps_the_logo_it_was_issued_with(): void
     {
         $invoice = $this->invoiceWithLogo();
-        $issuedWith = $invoice->business_snapshot['logo_path'];
+        $issuedWith = $invoice->business_snapshot['logo_id'];
 
         $this->actingAs($this->createAdmin())
             ->put(route('admin.billing.businesses.update', $this->business), $this->payload([
@@ -205,8 +207,8 @@ final class CheckpointF2BrandingTest extends TestCase
             ]))
             ->assertOk();
 
-        $this->assertNull($this->business->fresh()->logo_path);
-        $this->assertSame($issuedWith, $invoice->fresh()->business_snapshot['logo_path']);
+        $this->assertNull($this->business->fresh()->logo_id);
+        $this->assertSame($issuedWith, $invoice->fresh()->business_snapshot['logo_id']);
         $this->assertStringContainsString(
             '<img class="brand-logo"',
             app(InvoicePdfRenderer::class)->html($invoice->fresh()),
@@ -265,6 +267,7 @@ final class CheckpointF2BrandingTest extends TestCase
     private function payload(array $overrides = []): array
     {
         return array_merge([
+            'legal_entity_id' => $this->business->legal_entity_id,
             'name' => $this->business->name,
             'contact_email' => 'billing@example.com',
             'notification_email' => 'alerts@example.com',

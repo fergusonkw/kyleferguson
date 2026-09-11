@@ -24,7 +24,7 @@
                 ['title' => 'Currency', 'data' => 'default_currency', 'className' => 'text-center', 'width' => '80px'],
                 ['title' => 'Clients', 'data' => 'clients_count', 'className' => 'text-center', 'width' => '80px'],
                 ['title' => 'Providers', 'data' => 'providers_count', 'className' => 'text-center', 'width' => '80px'],
-                ['title' => 'Tax Status', 'data' => 'tax_registered', 'orderable' => false, 'className' => 'text-center'],
+                ['title' => 'Legal Entity', 'data' => 'legal_entity', 'orderable' => false],
                 ['title' => 'Actions', 'data' => 'actions', 'orderable' => false, 'searchable' => false, 'className' => 'text-center', 'width' => '120px'],
             ]"
             ajax-url="{{ route('admin.billing.businesses.data') }}"
@@ -41,6 +41,12 @@
             <p class="text-xs font-semibold uppercase text-default-400 tracking-wider mb-3">Identity</p>
             <x-admin-v2.form.input name="name" label="Business Name" :required="true" placeholder="e.g. Kyle Ferguson Consulting" />
             <x-admin-v2.form.input name="legal_name" label="Legal Name" placeholder="e.g. Kyle Ferguson Consulting Inc." />
+            <x-admin-v2.form.select name="legal_entity_id" label="Legal Entity" :options="$legalEntities"
+                placeholder="Select the person or corporation behind it" :required="true" />
+            <p class="text-xs text-default-400 -mt-3 mb-4">
+                GST/HST registration and the $30,000 threshold are the legal entity's — every business under it
+                counts toward the same threshold. <a href="{{ route('admin.billing.legal-entities.index') }}" class="text-primary">Manage legal entities</a>
+            </p>
             <x-admin-v2.form.textarea name="address" label="Business Address" rows="3" placeholder="Street, City, Province, Postal" />
 
             <hr class="border-default-200 my-4">
@@ -123,8 +129,7 @@
             </p>
 
             <hr class="border-default-200 my-4">
-            <p class="text-xs font-semibold uppercase text-default-400 tracking-wider mb-3">Tax &amp; Late Fees</p>
-            <x-admin-v2.form.input name="tax_registered_from" type="date" label="GST/HST Registered From (optional)" />
+            <p class="text-xs font-semibold uppercase text-default-400 tracking-wider mb-3">Late Fees</p>
             <x-admin-v2.form.textarea name="late_fee_terms" label="Late Fee Terms (rendered on invoice footer)" rows="2"
                 placeholder="A 2% monthly interest charge applies to balances unpaid after 30 days." />
 
@@ -171,7 +176,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function populateForm (b) {
         document.getElementById('businessId').value = b.id;
         for (const k of ['name','legal_name','address','contact_email','notification_email','brand_primary_color',
-            'brand_secondary_color','invoice_number_prefix','default_currency','fx_source','tax_registered_from',
+            'brand_secondary_color','invoice_number_prefix','default_currency','fx_source','legal_entity_id',
             'daily_reminder_time','late_fee_terms','payment_terms_days','cheque_payable_to',
             'invoice_template_view','email_template_view']) {
             const el = document.querySelector(`[name="${k}"]`);
@@ -208,6 +213,9 @@ document.addEventListener('DOMContentLoaded', function () {
         document.querySelector('input[name="payment_terms_days"]').value = '14';
         const cad = document.querySelector('input[name="supported_currencies[]"][value="CAD"]');
         if (cad) cad.checked = true;
+        // With a single legal entity there is nothing to choose.
+        const entitySelect = document.querySelector('select[name="legal_entity_id"]');
+        if (entitySelect && entitySelect.options.length === 2) entitySelect.selectedIndex = 1;
         HSOverlay.open('#businessOffcanvas');
     });
 

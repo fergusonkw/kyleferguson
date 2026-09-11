@@ -45,7 +45,10 @@ final class HostedInvoiceController extends Controller
     public function pdf(string $token): StreamedResponse
     {
         $invoice = $this->resolve($token);
-        $contents = $this->pdf->contents($invoice);
+
+        // The current copy, not the one captured at issue: a client
+        // downloading after paying should get a document that says so.
+        $contents = $this->pdf->pdf($invoice);
 
         return response()->streamDownload(
             fn () => print ($contents),

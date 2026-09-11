@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\Billing\BusinessSwitcherController;
 use App\Http\Controllers\Admin\Billing\ClientController as BillingClientController;
 use App\Http\Controllers\Admin\Billing\CostProviderController;
 use App\Http\Controllers\Admin\Billing\InvoiceController;
+use App\Http\Controllers\Admin\Billing\LegalEntityController;
 use App\Http\Controllers\Admin\Billing\PaymentController;
 use App\Http\Controllers\Admin\Billing\ProjectController as BillingProjectController;
 use App\Http\Controllers\Admin\Billing\ReceivablesController;
@@ -143,6 +144,15 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'email.verified', '2
         Route::put('businesses/{business}', [BusinessController::class, 'update'])->name('businesses.update');
         Route::delete('businesses/{business}', [BusinessController::class, 'destroy'])->name('businesses.destroy');
 
+        // Legal entities
+        Route::get('legal-entities', [LegalEntityController::class, 'index'])->name('legal-entities.index');
+        Route::get('legal-entities/data', [LegalEntityController::class, 'data'])->name('legal-entities.data');
+        Route::get('legal-entities/options', [LegalEntityController::class, 'options'])->name('legal-entities.options');
+        Route::post('legal-entities', [LegalEntityController::class, 'store'])->name('legal-entities.store');
+        Route::get('legal-entities/{legalEntity}/edit', [LegalEntityController::class, 'edit'])->name('legal-entities.edit');
+        Route::put('legal-entities/{legalEntity}', [LegalEntityController::class, 'update'])->name('legal-entities.update');
+        Route::delete('legal-entities/{legalEntity}', [LegalEntityController::class, 'destroy'])->name('legal-entities.destroy');
+
         // Clients
         Route::get('clients', [BillingClientController::class, 'index'])->name('clients.index');
         Route::get('clients/data', [BillingClientController::class, 'data'])->name('clients.data');
@@ -170,6 +180,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'email.verified', '2
         Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
         Route::get('invoices/{invoice}/preview', [InvoiceController::class, 'preview'])->name('invoices.preview');
         Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'downloadPdf'])->name('invoices.pdf');
+        Route::get('invoices/{invoice}/pdf/issued', [InvoiceController::class, 'downloadIssuedPdf'])->name('invoices.pdf.issued');
         Route::post('invoices/{invoice}/regenerate', [InvoiceController::class, 'regenerate'])->name('invoices.regenerate');
         Route::post('invoices/{invoice}/approve', [InvoiceController::class, 'approve'])->name('invoices.approve');
         Route::post('invoices/{invoice}/sent', [InvoiceController::class, 'markSent'])->name('invoices.sent');

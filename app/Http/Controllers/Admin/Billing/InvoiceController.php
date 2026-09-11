@@ -154,10 +154,7 @@ final class InvoiceController extends Controller
     {
         $this->authorize('approve', $invoice);
 
-        return $this->attempt(fn (): string => tap(
-            $this->approver->approve($invoice),
-            fn (Invoice $approved) => $this->pdf->store($approved),
-        )->invoice_number.' approved.');
+        return $this->attempt(fn (): string => $this->approver->approve($invoice)->invoice_number.' approved.');
     }
 
     /**
@@ -490,16 +487,27 @@ final class InvoiceController extends Controller
         ]);
     }
 
+    /**
+     * The invoice as it stands now, rendered on request — payments received
+     * since it was issued included.
+     */
     public function downloadPdf(Invoice $invoice): StreamedResponse
     {
         $this->authorize('downloadPdf', $invoice);
 
-        $contents = $this->pdf->contents($invoice);
+        return $this->streamPdf($this->pdf->pdf($invoice), $this->pdf->downloadFilename($invoice));
+    }
 
-        return response()->streamDownload(
-            fn () => print ($contents),
-            $this->pdf->downloadFilename($invoice),
-            ['Content-Type' => 'application/pdf'],
+    /**
+     * The document exactly as the client was last sent it.
+     */
+    public function downloadIssuedPdf(Invoice $invoice): StreamedResponse
+    {
+        $this->authorize('downloadPdf', $invoice);
+
+        return $this->streamPdf(
+            $this->pdf->issuedPdf($invoice),
+            $invoice->invoice_number.' (as issued).pdf',
         );
     }
 
@@ -531,6 +539,15 @@ final class InvoiceController extends Controller
                 ? []
                 : Client::query()->where('business_id', $business->id)->orderBy('name')->get(['id', 'name']),
         ]);
+    }
+
+    private function streamPdf(string $contents, string $filename): StreamedResponse
+    {
+        return response()->streamDownload(
+            fn () => print ($contents),
+            $filename,
+            ['Content-Type' => 'application/pdf'],
+        );
     }
 
     /**

@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 
 /**
@@ -27,6 +28,7 @@ use Illuminate\Support\Str;
  * @property string $subtotal
  * @property string $tax_total
  * @property string $total
+ * @property string|null $supply_value_cad
  * @property string $fx_rate_snapshot
  * @property string|null $fx_rate_source
  * @property string|null $fx_rate_period
@@ -38,7 +40,6 @@ use Illuminate\Support\Str;
  * @property \Illuminate\Support\Carbon|null $approved_at
  * @property \Illuminate\Support\Carbon|null $sent_at
  * @property \Illuminate\Support\Carbon|null $voided_at
- * @property string|null $pdf_path
  * @property string $hosted_view_token
  * @property string|null $notes
  * @property-read Business $business
@@ -46,6 +47,8 @@ use Illuminate\Support\Str;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, InvoiceLine> $lines
  * @property-read \Illuminate\Database\Eloquent\Collection<int, InvoiceLine> $topLevelLines
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Payment> $payments
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, InvoiceDocument> $documents
+ * @property-read InvoiceDocument|null $issuedDocument
  *
  * @method static \Database\Factories\Billing\InvoiceFactory factory($count = null, $state = [])
  *
@@ -82,7 +85,6 @@ final class Invoice extends Model
         'approved_at',
         'sent_at',
         'voided_at',
-        'pdf_path',
         'hosted_view_token',
         'notes',
     ];
@@ -126,6 +128,27 @@ final class Invoice extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
+    }
+
+    /**
+     * Every document this invoice was issued as — at approval, then once per
+     * resend — oldest first.
+     *
+     * @return HasMany<InvoiceDocument, $this>
+     */
+    public function documents(): HasMany
+    {
+        return $this->hasMany(InvoiceDocument::class)->orderBy('id');
+    }
+
+    /**
+     * The document the client most recently received.
+     *
+     * @return HasOne<InvoiceDocument, $this>
+     */
+    public function issuedDocument(): HasOne
+    {
+        return $this->hasOne(InvoiceDocument::class)->latestOfMany();
     }
 
     /**
@@ -196,6 +219,7 @@ final class Invoice extends Model
             'subtotal' => 'decimal:2',
             'tax_total' => 'decimal:2',
             'total' => 'decimal:2',
+            'supply_value_cad' => 'decimal:2',
             'fx_rate_snapshot' => 'decimal:8',
             'business_snapshot' => 'array',
             'client_snapshot' => 'array',

@@ -34,7 +34,7 @@ final class StoreBusinessRequest extends FormRequest
             'supported_currencies' => ['required', 'array', 'min:1'],
             'supported_currencies.*' => ['string', 'size:3'],
             'fx_source' => ['required', 'string', 'max:64'],
-            'tax_registered_from' => ['nullable', 'date'],
+            'legal_entity_id' => ['required', 'integer', 'exists:legal_entities,id'],
             'daily_reminder_time' => ['required', 'date_format:H:i'],
             'late_fee_terms' => ['nullable', 'string', 'max:2000'],
             'payment_terms_days' => ['sometimes', 'integer', 'min:0', 'max:365'],
@@ -67,6 +67,8 @@ final class StoreBusinessRequest extends FormRequest
         return [
             'name.required' => 'A business name is required.',
             'name.unique' => 'A business with this name already exists.',
+            'legal_entity_id.required' => 'Choose the legal entity this business trades under.',
+            'legal_entity_id.exists' => 'The selected legal entity does not exist.',
             'contact_email.required' => 'A contact email is required.',
             'notification_email.required' => 'A notification email is required (where draft-invoice alerts are sent).',
             'default_currency.size' => 'Currency must be a 3-letter code (e.g. CAD).',

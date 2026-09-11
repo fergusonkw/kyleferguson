@@ -44,17 +44,22 @@ DO billing ingestion is **not built in v1**. Laravel Cloud is under consideratio
 
 ## Tax
 
-Tax registration status is tracked **per business**. Each business has its own $30K threshold and its own `tax_registered_from` date. As of v1, no business is GST/HST registered.
+Tax registration status is tracked **per legal entity**, not per business. A business is a trade name; GST/HST belongs to the person or corporation behind it (`legal_entities`), so every business under an entity shares one `tax_registered_from` date and one $30K small-supplier threshold. Today every business is a trade name of one sole proprietor. When Tracker Pull is split into a corporation, add it as a second legal entity, move the business onto it, and mark the two as **associated**. As modelled here, supplies of associated entities (e.g. a corporation its owner controls) are added together for the threshold even though each registers separately — confirm which entities are associated with an accountant. As of v1, no entity is GST/HST registered.
 
 While unregistered:
 
 - Client invoices show **no tax line**. Subtotal equals total.
 - DO's GST/HST charged on services to the business is **not recoverable** (no ITC available). It is treated as a cost input: `(DO USD cost + DO USD tax) → convert to CAD → apply markup`. The client sees one rolled-up hosting figure; DO's tax is invisibly absorbed by markup.
-- The system tracks **trailing 12-month revenue** and surfaces a warning on the dashboard as revenue approaches $30K, with sufficient lead time to register before crossing the CRA's 4-consecutive-quarters threshold.
+- The system tracks the **small-supplier threshold** per legal entity (with its associates) and warns before it is crossed:
+  - It trips on **either** test: more than $30,000 in a single calendar quarter, or more than $30,000 across four consecutive calendar quarters. The dashboard shows the four-quarter window ending with the current quarter, and also treats the window ending last quarter as tripped, so a quarter rolling over does not hide a threshold already passed.
+  - A supply counts on its invoice's `issued_on` date (set at approval), for invoices that are approved, sent, partially paid or paid. Drafts and voided invoices do not count.
+  - Its value is fixed in CAD at approval (`invoices.supply_value_cad`): the sum of billable lines excluding **credit** lines (a carried-forward overpayment settles money already received; it does not reduce the supply). Discounts and adjustments do reduce it. A non-CAD invoice converts at the Bank of Canada monthly average for the invoice's period — the same source the invoice itself uses. If that rate is not available at approval, the approval still goes through and the value is filled in by the daily check.
+  - Each entity has a configurable warning percentage (default 80%). `SmallSupplierThresholdAlertJob` runs daily at 08:15 and emails the operator once on reaching the warning level and once more on passing the threshold. A level that falls back re-arms the alert.
+  - Only invoices issued through this system are counted. Revenue earned elsewhere is not included.
 
 The schema anticipates the future transition:
 
-- A `tax_registered_from` date lives on the business configuration.
+- A `tax_registered_from` date lives on the legal entity.
 - Invoice generation branches on whether the invoice date falls before or after that date.
 - Past invoices remain immutable and correct regardless of future registration.
 
@@ -148,7 +153,7 @@ The dashboard surfaces at minimum:
 
 - **Unattributed resources**: anything in a provider's default/holding project, in a project not mapped to a client, or a synthetic account resource (e.g. an SMTP2GO account) not yet assigned to a project.
 - **Cost gap**: provider-reported total billed this period vs. sum of client-attributed costs + overhead. Anything non-zero needs an explanation. Only meaningful once a provider with a cost API is connected — with SMTP2GO alone the "billed" figure is the operator-entered fee, so the gap is zero by construction and the tile shows `—`.
-- **Trailing 12-month revenue per business**: progress toward each business's $30K registration threshold. *(Phase 3 — needs invoices.)*
+- **GST/HST small-supplier threshold per legal entity**: the four-quarter and current-quarter totals against $30K, across every business under the entity and its associates (see § Tax).
 - **Pending drafts**: invoices awaiting approval, oldest first. *(Phase 3.)*
 
 ## Provider abstraction

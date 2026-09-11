@@ -49,7 +49,7 @@ final class InvoiceSnapshotter
             'address' => $business->address,
             'contact_email' => $business->contact_email,
             'cheque_payable_to' => $business->cheque_payable_to,
-            'logo_path' => $business->logo_path,
+            'logo_id' => $business->logo_id,
             'brand_primary_color' => $business->brand_primary_color,
             'brand_secondary_color' => $business->brand_secondary_color,
         ];

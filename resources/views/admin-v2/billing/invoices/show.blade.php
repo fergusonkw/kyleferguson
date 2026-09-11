@@ -55,9 +55,16 @@
                    class="btn btn-sm btn-light">
                     <i data-lucide="eye" class="size-4 me-1"></i> Preview
                 </a>
-                <a href="{{ route('admin.billing.invoices.pdf', $invoice) }}" class="btn btn-sm btn-light">
+                <a href="{{ route('admin.billing.invoices.pdf', $invoice) }}" class="btn btn-sm btn-light"
+                   title="The invoice as it stands now, including any payments received">
                     <i data-lucide="download" class="size-4 me-1"></i> PDF
                 </a>
+                @if($invoice->approved_at !== null)
+                    <a href="{{ route('admin.billing.invoices.pdf.issued', $invoice) }}" class="btn btn-sm btn-light"
+                       title="Exactly what the client was last sent">
+                        <i data-lucide="file-text" class="size-4 me-1"></i> As issued
+                    </a>
+                @endif
                 @can('update', $invoice)
                     <button type="button" class="btn btn-sm btn-light" id="regenerateBtn">
                         <i data-lucide="refresh-cw" class="size-4 me-1"></i> Rebuild

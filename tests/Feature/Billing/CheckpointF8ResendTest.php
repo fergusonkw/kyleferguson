@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Billing;
 
+use App\Enums\Billing\InvoiceDocumentReason;
 use App\Enums\Billing\InvoiceStatus;
 use App\Enums\Permission;
 use App\Mail\Billing\ClientInvoiceMail;
@@ -11,6 +12,7 @@ use App\Models\AuditLog;
 use App\Models\Billing\Business;
 use App\Models\Billing\Client;
 use App\Models\Billing\Invoice;
+use App\Models\Billing\InvoiceDocument;
 use App\Models\Permission as PermissionModel;
 use App\Models\Role;
 use App\Models\User;
@@ -128,17 +130,52 @@ final class CheckpointF8ResendTest extends TestCase
         Mail::assertNothingSent();
     }
 
-    public function test_the_pdf_is_re_rendered_with_the_new_due_date(): void
+    public function test_the_document_is_re_issued_with_the_new_due_date(): void
     {
-        // The stored PDF dates from approval. Attaching it after the due date
-        // moved would send a document that contradicts the email.
+        // The document captured at approval carries the old due date. Sending
+        // it after the date moved would contradict the email it rides with.
         $invoice = $this->sentInvoice();
         $restarted = now()->addDays(30);
 
         $this->resend($invoice, ['due_on' => $restarted->toDateString()])->assertOk();
 
-        Pdf::assertSaved(Storage::disk('local')->path("invoices/{$this->business->id}/{$invoice->invoice_number}.pdf"));
+        $document = $invoice->fresh()->issuedDocument;
+
+        $this->assertSame(InvoiceDocumentReason::Resent, $document->reason);
+        $this->assertStringContainsString($restarted->format('F j, Y'), $document->html);
+    }
+
+    public function test_a_resend_keeps_the_earlier_document_alongside_the_new_one(): void
+    {
+        $invoice = $this->sentInvoice();
+        InvoiceDocument::factory()->for($invoice)->create(['html' => '<p>as first sent</p>']);
+
+        $this->resend($invoice, ['due_on' => now()->addDays(30)->toDateString()])->assertOk();
+
+        $documents = $invoice->fresh()->documents;
+
+        $this->assertCount(2, $documents);
+        $this->assertSame('<p>as first sent</p>', $documents->first()->html);
+        $this->assertSame(InvoiceDocumentReason::Resent, $documents->last()->reason);
+    }
+
+    public function test_the_resent_email_attaches_the_re_issued_document(): void
+    {
+        $invoice = $this->sentInvoice();
+        $restarted = now()->addDays(30);
+
+        $this->resend($invoice, ['due_on' => $restarted->toDateString()])->assertOk();
+
+        Mail::assertSent(ClientInvoiceMail::class, function (ClientInvoiceMail $mail): bool {
+            foreach ($mail->attachments() as $attachment) {
+                $attachment->attachWith(fn () => null, fn ($data) => $data());
+            }
+
+            return true;
+        });
+
         Pdf::assertSee($restarted->format('F j, Y'));
+        $this->assertNotNull($invoice->fresh()->issuedDocument);
     }
 
     // ---- The link ----------------------------------------------------------

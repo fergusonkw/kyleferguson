@@ -16,7 +16,6 @@ use App\Models\Billing\Payment;
 use App\Services\Billing\InvoiceApprover;
 use App\Services\Billing\InvoicePdfRenderer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
@@ -321,16 +320,12 @@ final class CheckpointE2ApprovalAndPdfTest extends TestCase
         $invoice = $this->billableInvoice();
         app(InvoiceApprover::class)->approve($invoice);
 
-        $path = app(InvoicePdfRenderer::class)->store($invoice->fresh());
-        $disk = Storage::disk('local');
+        $renderer = app(InvoicePdfRenderer::class);
 
-        $this->assertTrue($disk->exists($path));
-        $this->assertSame("invoices/{$this->business->id}/{$invoice->invoice_number}.pdf", $path);
-        $this->assertStringStartsWith('%PDF-', (string) $disk->get($path));
-        $this->assertGreaterThan(1000, $disk->size($path));
-        $this->assertSame($path, $invoice->fresh()->pdf_path);
-
-        $disk->delete($path);
+        foreach ([$renderer->issuedPdf($invoice->fresh()), $renderer->pdf($invoice->fresh())] as $pdf) {
+            $this->assertStringStartsWith('%PDF-', $pdf);
+            $this->assertGreaterThan(1000, strlen($pdf));
+        }
     }
 
     private function billableInvoice(): Invoice

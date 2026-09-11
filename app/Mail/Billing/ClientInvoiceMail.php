@@ -89,7 +89,7 @@ final class ClientInvoiceMail extends Mailable
 
         return [
             Attachment::fromData(
-                fn (): string => $renderer->contents($this->invoice),
+                fn (): string => $renderer->issuedPdf($this->invoice),
                 $renderer->downloadFilename($this->invoice),
             )->withMime('application/pdf'),
         ];

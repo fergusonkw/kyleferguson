@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Billing;
 
+use App\Enums\Billing\InvoiceDocumentReason;
 use App\Enums\Billing\InvoiceStatus;
 use App\Exceptions\Billing\InvalidInvoiceTransition;
 use App\Models\Billing\Invoice;
@@ -22,6 +23,8 @@ final class InvoiceApprover
     public function __construct(
         private readonly AuditLogger $audit,
         private readonly InvoiceSnapshotter $snapshots,
+        private readonly SmallSupplierThreshold $threshold,
+        private readonly InvoicePdfRenderer $documents,
     ) {}
 
     /**
@@ -40,7 +43,7 @@ final class InvoiceApprover
             throw InvalidInvoiceTransition::because($invoice, 'has a negative total and cannot be approved');
         }
 
-        return $this->apply($invoice, InvoiceStatus::Approved, function (Invoice $invoice): void {
+        $approved = $this->apply($invoice, InvoiceStatus::Approved, function (Invoice $invoice): void {
             $issuedOn = now();
 
             // Approval is the moment the invoice becomes a permanent record, so
@@ -62,7 +65,18 @@ final class InvoiceApprover
                 'issued_on' => $issuedOn->toDateString(),
                 'due_on' => $dueOn->toDateString(),
             ])->save();
+
+            // The record of what the client is being sent, captured in the same
+            // transaction as the approval so one never exists without the other.
+            $this->documents->freeze($invoice, InvoiceDocumentReason::Approved);
         });
+
+        // Outside the transaction: it may need an exchange rate fetched, and a
+        // rate that is not available yet is filled in later rather than
+        // holding up the approval.
+        $this->threshold->recordSupplyValue($approved);
+
+        return $approved;
     }
 
     /**

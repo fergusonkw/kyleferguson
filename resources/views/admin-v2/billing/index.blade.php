@@ -56,6 +56,18 @@
         <x-admin-v2.billing.receivable-cards :summary="$receivables" />
     @endisset
 
+    @isset($threshold)
+        <x-admin-v2.billing.threshold-card :assessment="$threshold" />
+    @endisset
+
+    @if(isset($currentBusiness) && $currentBusiness->legal_entity_id === null)
+        <x-admin-v2.alert
+            type="warning"
+            class="mt-8"
+            message="{{ $currentBusiness->name }} has no legal entity, so the GST/HST threshold is not being tracked for it. Set one on the business."
+        />
+    @endif
+
     <div class="flex items-center justify-between mt-8 mb-3">
         <h5 class="text-sm font-semibold text-default-500 uppercase">Configuration</h5>
     </div>
@@ -139,9 +151,8 @@
         @if($trailingCost->isNotEmpty())
             <x-admin-v2.card title="Trailing 12-month cost" class="mt-5">
                 <p class="text-sm text-default-500 mb-4">
-                    Ingested cost basis per period. This is cost, not revenue — the trailing-revenue
-                    gauge against the $30K registration threshold still needs a decision on how
-                    invoices issued in other currencies count toward a CAD threshold.
+                    Ingested cost basis per period, in USD. This is what the work cost, not what was
+                    billed — revenue against the GST/HST threshold is tracked above.
                 </p>
                 <div class="overflow-x-auto">
                     <div class="flex items-end gap-2 min-w-[480px] h-32">

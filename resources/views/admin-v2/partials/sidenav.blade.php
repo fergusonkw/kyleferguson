@@ -119,6 +119,15 @@
                     </li>
                     @endcan
 
+                    @can('viewAny', App\Models\Billing\LegalEntity::class)
+                    <li class="menu-item">
+                        <a href="{{ route('admin.billing.legal-entities.index') }}" class="menu-link">
+                            <span class="menu-icon"><i data-lucide="landmark"></i></span>
+                            <span class="menu-text">Legal Entities</span>
+                        </a>
+                    </li>
+                    @endcan
+
                     @can('viewAny', App\Models\Billing\Client::class)
                     <li class="menu-item">
                         <a href="{{ route('admin.billing.clients.index') }}" class="menu-link">
