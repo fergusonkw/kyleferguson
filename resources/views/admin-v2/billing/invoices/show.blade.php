@@ -75,6 +75,10 @@
                         <button type="button" class="btn btn-sm btn-primary" id="sentBtn">
                             <i data-lucide="mail" class="size-4 me-1"></i> Mark Sent
                         </button>
+                    @elseif($invoice->status->isIssued())
+                        <button type="button" class="btn btn-sm btn-light" id="resendBtn">
+                            <i data-lucide="mail" class="size-4 me-1"></i> Resend
+                        </button>
                     @endif
                 @endcan
                 @can('void', $invoice)
@@ -263,6 +267,36 @@
                 </div>
             </x-admin-v2.card>
 
+            @if($invoice->status->isIssued())
+                {{-- Only an issued invoice resolves at its link, so only an
+                     issued one has a link worth showing or replacing. --}}
+                <x-admin-v2.card title="Client Link" class="mt-5">
+                    <p class="text-xs text-default-400 mb-3">
+                        Anyone with this link can view the invoice and download its PDF — no login.
+                    </p>
+                    <div class="flex gap-2">
+                        <input type="text" id="clientLinkInput" readonly
+                               class="form-input form-input-sm grow font-mono text-xs"
+                               value="{{ route('invoices.hosted.show', $invoice->hosted_view_token) }}"
+                               aria-label="Client link">
+                        <button type="button" class="btn btn-sm btn-light" id="copyLinkBtn"
+                                aria-label="Copy link" title="Copy link">
+                            <i data-lucide="copy" class="size-4"></i>
+                        </button>
+                    </div>
+                    @can('rotateLink', $invoice)
+                        <div class="flex items-start justify-between gap-3 mt-3">
+                            <p class="text-xs text-default-400 mb-0">
+                                Sent to the wrong person? Replace it — the old link stops working at once.
+                            </p>
+                            <button type="button" class="btn btn-sm btn-light text-danger shrink-0" id="rotateLinkBtn">
+                                <i data-lucide="rotate-ccw" class="size-4 me-1"></i> Replace
+                            </button>
+                        </div>
+                    @endcan
+                </x-admin-v2.card>
+            @endif
+
             <x-admin-v2.card title="Snapshot" class="mt-5">
                 <p class="text-xs text-default-400 mb-3">
                     Captured at generation so this invoice stays reproducible.
@@ -331,6 +365,55 @@
                 </div>
             </form>
         </x-admin-v2.offcanvas>
+    @endcan
+
+    @can('send', $invoice)
+        @if($invoice->status->isIssued())
+            {{-- What "give them the full terms" means today, offered as one click
+                 rather than left for the operator to count out. Kept to the
+                 one-line form deliberately: this view already uses it for the
+                 line metadata, and Blade mis-pairs a later block-form opener
+                 and closer with that earlier one-liner. --}}
+            @php($restartedDueOn = now()->addDays($invoice->business->payment_terms_days))
+            <x-admin-v2.offcanvas canvasId="resendOffcanvas" title="Resend Invoice" size="medium">
+                <form id="resendForm">
+                    @csrf
+                    <x-admin-v2.form.input name="recipient" type="email" label="Send to" :required="true"
+                                           :value="$invoice->client->contact_email" />
+                    <p class="text-xs text-default-400 -mt-3 mb-4">
+                        The client's current address. This changes where this one email goes — update the client
+                        to change where future invoices go.
+                    </p>
+
+                    <x-admin-v2.form.input name="due_on" type="date" label="Due date"
+                                           :value="$invoice->due_on?->toDateString()" />
+                    <p class="text-xs text-default-400 -mt-3 mb-4">
+                        If the first email went astray, the client should not be held to terms that started before
+                        they had the invoice.
+                        <button type="button" class="text-primary underline" id="restartTermsBtn"
+                                data-date="{{ $restartedDueOn->toDateString() }}">
+                            Restart the {{ $invoice->business->payment_terms_days }}-day terms
+                            ({{ $restartedDueOn->format('M j, Y') }})
+                        </button>
+                    </p>
+
+                    <x-admin-v2.form.checkbox name="replace_link"
+                        label="Replace the client link"
+                        help="Tick this if the last email reached someone who should not have it. Their link stops working; this email carries the new one." />
+
+                    <p class="text-xs text-default-400">
+                        The PDF is re-rendered before sending, so it shows the current due date and balance.
+                    </p>
+
+                    <div class="border-t border-default-200 flex gap-2 justify-end pt-4 mt-4">
+                        <button type="button" class="btn btn-light" data-hs-overlay="#resendOffcanvas">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="resendSubmitBtn">
+                            <i data-lucide="mail" class="size-4 me-1"></i><span class="btn-text">Resend</span>
+                        </button>
+                    </div>
+                </form>
+            </x-admin-v2.offcanvas>
+        @endif
     @endcan
 
     @can('recordPayment', $invoice)
@@ -406,6 +489,54 @@ document.addEventListener('DOMContentLoaded', function () {
         );
         if (!ok) return;
         report(await post(`${base}/void`), 'Could not void.');
+    });
+
+    document.getElementById('resendBtn')?.addEventListener('click', () => {
+        HSOverlay.open('#resendOffcanvas');
+    });
+
+    document.getElementById('restartTermsBtn')?.addEventListener('click', (e) => {
+        document.querySelector('#resendForm input[name="due_on"]').value = e.currentTarget.dataset.date;
+    });
+
+    document.getElementById('resendForm')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const btn = document.getElementById('resendSubmitBtn');
+        btn.disabled = true;
+
+        try {
+            report(await post(`${base}/resend`, new FormData(e.target)), 'Could not resend the invoice.');
+        } finally {
+            btn.disabled = false;
+        }
+    });
+
+    document.getElementById('copyLinkBtn')?.addEventListener('click', async () => {
+        const input = document.getElementById('clientLinkInput');
+
+        // The Clipboard API only exists in a secure context, and a local
+        // `.test` domain over plain HTTP is not one — so fall back to
+        // selecting the field and copying the old way.
+        try {
+            await navigator.clipboard.writeText(input.value);
+        } catch {
+            input.select();
+            document.execCommand('copy');
+        }
+
+        Alert.toast('Link copied.', 'success');
+    });
+
+    document.getElementById('rotateLinkBtn')?.addEventListener('click', async () => {
+        const ok = await Alert.confirm(
+            'The current link stops working immediately — including the one in the email the client already has. '
+            + 'Resend the invoice to give them the new one.',
+            'Replace the client link?',
+            'Replace link',
+        );
+        if (!ok) return;
+        report(await post(`${base}/rotate-link`), 'Could not replace the link.');
     });
 
     document.getElementById('saveDueDateBtn')?.addEventListener('click', async () => {

@@ -54,9 +54,9 @@ final class ProjectController extends Controller
             });
         if ($search !== '') {
             $query->where(function ($q) use ($search): void {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('do_project_uuid', 'like', "%{$search}%")
-                    ->orWhereHas('client', fn ($c) => $c->where('name', 'like', "%{$search}%"));
+                $q->whereLike('name', "%{$search}%")
+                    ->orWhereLike('do_project_uuid', "%{$search}%")
+                    ->orWhereHas('client', fn ($c) => $c->whereLike('name', "%{$search}%"));
             });
         }
 

@@ -43,7 +43,7 @@ final class UpdateBusinessRequest extends FormRequest
 
             // The logo is inlined into every rendered invoice as a data URI,
             // so the cap is about document size as much as upload size.
-            'logo' => ['nullable', 'image', 'mimes:png,jpg,jpeg,webp', 'max:512'],
+            'logo' => ['nullable', 'image:allow_svg', 'mimes:png,jpg,jpeg,webp,svg', 'max:512'],
             'remove_logo' => ['nullable', 'boolean'],
 
             // Both columns are non-nullable with a default, so these are

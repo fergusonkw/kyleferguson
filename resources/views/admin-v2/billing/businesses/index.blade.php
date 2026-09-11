@@ -89,8 +89,9 @@
                     <span class="text-sm">Remove the current logo</span>
                 </label>
                 <p class="text-xs text-default-400 mt-1.5">
-                    Replaces the initials block on invoices. Embedded in each document, so keep it small —
-                    512&nbsp;KB max. Uploading a new one never alters invoices already issued.
+                    Replaces the initials block on invoices. PNG, JPG, WebP or SVG — prefer SVG, which stays
+                    sharp in print. Embedded in each document, so keep it small — 512&nbsp;KB max. Uploading a
+                    new one never alters invoices already issued.
                 </p>
             </div>
 

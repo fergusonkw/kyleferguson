@@ -26,6 +26,7 @@ final class SyncInvoiceFonts extends Command
     private const PACKAGES = [
         'Archivo' => '@fontsource/archivo',
         'Space Mono' => '@fontsource/space-mono',
+        'Inter' => '@fontsource/inter',
     ];
 
     protected $signature = 'billing:sync-invoice-fonts';

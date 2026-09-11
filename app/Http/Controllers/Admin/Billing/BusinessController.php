@@ -46,9 +46,9 @@ final class BusinessController extends Controller
 
         if ($searchValue !== '') {
             $query->where(function ($q) use ($searchValue): void {
-                $q->where('name', 'like', "%{$searchValue}%")
-                    ->orWhere('legal_name', 'like', "%{$searchValue}%")
-                    ->orWhere('contact_email', 'like', "%{$searchValue}%");
+                $q->whereLike('name', "%{$searchValue}%")
+                    ->orWhereLike('legal_name', "%{$searchValue}%")
+                    ->orWhereLike('contact_email', "%{$searchValue}%");
             });
         }
 

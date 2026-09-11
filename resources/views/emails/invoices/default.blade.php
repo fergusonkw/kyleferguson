@@ -1,6 +1,10 @@
 @php
     $money = fn ($v): string => '$'.number_format((float) $v, 2);
     $firstName = trim(explode(' ', trim((string) ($invoice->client_snapshot['contact_name'] ?? '')))[0] ?? '');
+    // Built here rather than with @if/@else inline: Blade will not compile a
+    // directive that a word character butts against, so `here@else` passed
+    // straight through into the sent mail as literal text.
+    $greeting = $firstName !== '' ? $firstName.', here' : 'Here';
 @endphp
 <!DOCTYPE html>
 <html lang="en">
@@ -22,7 +26,7 @@
             Invoice {{ $invoice->invoice_number }}
           </h1>
           <p style="margin:0;font-size:15px;color:#71747e;line-height:1.6;max-width:440px;">
-            @if($firstName !== ''){{ $firstName }}, here@else Here @endif is your invoice for {{ $periodLabel }}.
+            {{ $greeting }} is your invoice for {{ $periodLabel }}.
             The PDF is attached, and you can view it online any time using the link below.
           </p>
         </td>

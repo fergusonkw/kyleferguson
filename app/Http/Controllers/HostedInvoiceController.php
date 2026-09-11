@@ -21,6 +21,13 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 final class HostedInvoiceController extends Controller
 {
+    /**
+     * The token is the URL, so the URL must not travel. Without this, any
+     * link a template ever grows — a business's website in the footer — hands
+     * the full address, token included, to that site in the Referer header.
+     */
+    private const REFERRER_POLICY = ['Referrer-Policy' => 'no-referrer'];
+
     public function __construct(private readonly InvoicePdfRenderer $pdf) {}
 
     public function show(string $token): Response
@@ -32,7 +39,7 @@ final class HostedInvoiceController extends Controller
         return response($this->pdf->html($invoice, [
             'banner' => $this->paymentBanner($invoice),
             'downloadUrl' => route('invoices.hosted.pdf', $token),
-        ]));
+        ]))->withHeaders(self::REFERRER_POLICY);
     }
 
     public function pdf(string $token): StreamedResponse
@@ -43,7 +50,7 @@ final class HostedInvoiceController extends Controller
         return response()->streamDownload(
             fn () => print ($contents),
             $this->pdf->downloadFilename($invoice),
-            ['Content-Type' => 'application/pdf'],
+            ['Content-Type' => 'application/pdf', ...self::REFERRER_POLICY],
         );
     }
 

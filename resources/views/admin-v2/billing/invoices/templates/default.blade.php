@@ -22,6 +22,10 @@
     // Empty rather than null: a template rendered without the store still
     // produces valid CSS, it just falls back to system faces.
     $fontFaceCss ??= '';
+    // This template carries its own CSS rather than a shared document kit, so
+    // it is handed an empty string. Accepted and ignored so every template
+    // takes the same render arguments.
+    $kitCss ??= '';
     $hosted = $banner !== null || $downloadUrl !== null;
 
     $business = $invoice->business_snapshot ?? [];

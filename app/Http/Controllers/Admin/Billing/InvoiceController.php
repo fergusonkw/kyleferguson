@@ -9,6 +9,7 @@ use App\Enums\Billing\InvoiceStatus;
 use App\Enums\Billing\PaymentMethod;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Billing\GenerateInvoiceRequest;
+use App\Http\Requests\Billing\ResendInvoiceRequest;
 use App\Http\Requests\Billing\StoreInvoiceLineRequest;
 use App\Mail\Billing\ClientInvoiceMail;
 use App\Models\Billing\Client;
@@ -20,7 +21,9 @@ use App\Services\Billing\CurrentBusiness;
 use App\Services\Billing\FxRateService;
 use App\Services\Billing\InvoiceApprover;
 use App\Services\Billing\InvoiceBuilder;
+use App\Services\Billing\InvoiceLinkRotator;
 use App\Services\Billing\InvoicePdfRenderer;
+use App\Services\Billing\InvoiceResender;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -39,6 +42,8 @@ final class InvoiceController extends Controller
         private readonly InvoicePdfRenderer $pdf,
         private readonly FxRateService $fxRates,
         private readonly AuditLogger $audit,
+        private readonly InvoiceLinkRotator $linkRotator,
+        private readonly InvoiceResender $resender,
     ) {}
 
     public function index(): View
@@ -188,6 +193,31 @@ final class InvoiceController extends Controller
         return $this->attempt(fn (): string => $this->approver
             ->void($invoice, $reason !== '' ? $reason : null)
             ->invoice_number.' voided.');
+    }
+
+    /**
+     * Email an already-sent invoice again — to a corrected address, or to a
+     * client who has lost the first one.
+     */
+    public function resend(ResendInvoiceRequest $request, Invoice $invoice): JsonResponse
+    {
+        return $this->attempt(function () use ($request, $invoice): string {
+            $this->resender->resend($invoice, $request->recipient(), $request->dueOn(), $request->replacesLink());
+
+            return "{$invoice->invoice_number} re-sent to {$request->recipient()}.";
+        });
+    }
+
+    /**
+     * Replace the client link — for when it has reached someone it should
+     * not have. The old URL stops resolving immediately.
+     */
+    public function rotateLink(Invoice $invoice): JsonResponse
+    {
+        $this->authorize('rotateLink', $invoice);
+
+        return $this->attempt(fn (): string => $this->linkRotator->rotate($invoice)->invoice_number
+            .' has a new client link. The old one no longer works — resend the invoice to give the client the new one.');
     }
 
     /**

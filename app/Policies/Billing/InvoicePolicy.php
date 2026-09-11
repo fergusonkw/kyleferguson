@@ -49,6 +49,15 @@ final class InvoicePolicy
         return $user->hasPermission(Permission::ApproveInvoices->value);
     }
 
+    /**
+     * Replacing the client link decides who can read the invoice, which is
+     * the same call as sending it — so it sits behind the issuing permission.
+     */
+    public function rotateLink(User $user, Invoice $invoice): bool
+    {
+        return $user->hasPermission(Permission::ApproveInvoices->value);
+    }
+
     public function void(User $user, Invoice $invoice): bool
     {
         return $user->hasPermission(Permission::ApproveInvoices->value);

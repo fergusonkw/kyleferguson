@@ -56,6 +56,29 @@ final readonly class Smtp2goCycle
             && $this->cycleEnd->greaterThanOrEqualTo($periodStart);
     }
 
+    /**
+     * Every billing period the cycle overlaps, oldest first. A cycle anchored
+     * mid-month straddles two.
+     *
+     * @return list<string>
+     */
+    public function coveredPeriods(): array
+    {
+        if ($this->cycleStart === null || $this->cycleEnd === null || $this->cycleEnd->lessThan($this->cycleStart)) {
+            return [];
+        }
+
+        $periods = [];
+        $cursor = $this->cycleStart->copy()->startOfMonth();
+
+        while ($cursor->lessThanOrEqualTo($this->cycleEnd)) {
+            $periods[] = $cursor->format('Y-m');
+            $cursor->addMonthNoOverflow();
+        }
+
+        return $periods;
+    }
+
     public function isOverQuota(): bool
     {
         return $this->max > 0 && $this->used > $this->max;

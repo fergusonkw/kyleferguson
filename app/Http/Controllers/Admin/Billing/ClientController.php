@@ -51,9 +51,9 @@ final class ClientController extends Controller
         }
         if ($search !== '') {
             $query->where(function ($q) use ($search): void {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('contact_email', 'like', "%{$search}%")
-                    ->orWhere('contact_name', 'like', "%{$search}%");
+                $q->whereLike('name', "%{$search}%")
+                    ->orWhereLike('contact_email', "%{$search}%")
+                    ->orWhereLike('contact_name', "%{$search}%");
             });
         }
 

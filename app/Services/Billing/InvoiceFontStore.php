@@ -21,8 +21,9 @@ namespace App\Services\Billing;
 final class InvoiceFontStore
 {
     /**
-     * family => [weight => filename]. Only the weights the template actually
-     * uses, since every one of them is carried by every rendered invoice.
+     * family => [weight => filename]. Only the weights a template actually
+     * uses, since every one of them is carried by every invoice that asks for
+     * the family.
      *
      * @var array<string, array<int, string>>
      */
@@ -37,9 +38,32 @@ final class InvoiceFontStore
             400 => 'space-mono-latin-400-normal.woff2',
             700 => 'space-mono-latin-700-normal.woff2',
         ],
+        'Inter' => [
+            400 => 'inter-latin-400-normal.woff2',
+            500 => 'inter-latin-500-normal.woff2',
+            600 => 'inter-latin-600-normal.woff2',
+            700 => 'inter-latin-700-normal.woff2',
+        ],
     ];
 
-    private ?string $cached = null;
+    /**
+     * Template basename => the families it renders with.
+     *
+     * Scoped per template because the faces are embedded in every document:
+     * shipping all three families would put Inter into invoices set in Archivo
+     * and Archivo into invoices set in Inter, roughly doubling every PDF to no
+     * effect. A template not listed here gets every face — a heavier document
+     * beats one whose fonts silently fall back.
+     *
+     * @var array<string, list<string>>
+     */
+    private const TEMPLATE_FAMILIES = [
+        'default' => ['Archivo', 'Space Mono'],
+        'tracker-pull' => ['Inter'],
+    ];
+
+    /** @var array<string, string> */
+    private array $cached = [];
 
     /**
      * The directory is injectable so a caller — a test, or a host that keeps
@@ -49,24 +73,28 @@ final class InvoiceFontStore
     public function __construct(private readonly ?string $directory = null) {}
 
     /**
-     * `@font-face` declarations for every face present on disk.
+     * `@font-face` declarations for the faces the given template renders with,
+     * or for every vendored face when no template is named.
      *
      * Returns an empty string when the fonts have not been vendored, so the
      * template's own fallback stack takes over and an invoice still prints.
      */
-    public function faceCss(): string
+    public function faceCss(?string $templateView = null): string
     {
+        $families = $this->familiesFor($templateView);
+        $key = implode('|', $families);
+
         // Held for the instance: a nightly run generating many invoices would
         // otherwise re-read and re-encode 90KB of font per document. The store
-        // is a singleton, so that is once per process.
-        if ($this->cached !== null) {
-            return $this->cached;
+        // is a singleton, so that is once per process per family set.
+        if (isset($this->cached[$key])) {
+            return $this->cached[$key];
         }
 
         $rules = [];
 
-        foreach (self::FACES as $family => $weights) {
-            foreach ($weights as $weight => $filename) {
+        foreach ($families as $family) {
+            foreach (self::FACES[$family] as $weight => $filename) {
                 $uri = $this->dataUri($filename);
 
                 if ($uri === null) {
@@ -82,7 +110,7 @@ final class InvoiceFontStore
             }
         }
 
-        return $this->cached = implode("\n", $rules);
+        return $this->cached[$key] = implode("\n", $rules);
     }
 
     public function directory(): string
@@ -118,7 +146,23 @@ final class InvoiceFontStore
      */
     public function flush(): void
     {
-        $this->cached = null;
+        $this->cached = [];
+    }
+
+    /**
+     * The families a template declares, falling back to all of them.
+     *
+     * @return list<string>
+     */
+    private function familiesFor(?string $templateView): array
+    {
+        if ($templateView === null) {
+            return array_keys(self::FACES);
+        }
+
+        $name = str($templateView)->afterLast('.')->toString();
+
+        return self::TEMPLATE_FAMILIES[$name] ?? array_keys(self::FACES);
     }
 
     private function dataUri(string $filename): ?string

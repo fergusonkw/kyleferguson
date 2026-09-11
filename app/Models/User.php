@@ -6,12 +6,14 @@ namespace App\Models;
 
 use App\Enums\Role as RoleEnum;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
 
 /**
@@ -270,6 +272,18 @@ final class User extends Authenticatable implements MustVerifyEmail
         ])->save();
 
         return true;
+    }
+
+    /**
+     * Stored lowercase so a lookup matches however the address was typed.
+     * MySQL's case-insensitive collation used to hide this; Postgres compares
+     * exactly.
+     *
+     * @return Attribute<string, string>
+     */
+    protected function email(): Attribute
+    {
+        return Attribute::make(set: fn (string $value): string => Str::lower(trim($value)));
     }
 
     /**

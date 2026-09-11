@@ -38,8 +38,8 @@ final class RoleController extends Controller
 
         if ($searchValue !== '') {
             $query->where(function ($q) use ($searchValue): void {
-                $q->where('name', 'like', "%{$searchValue}%")
-                    ->orWhere('slug', 'like', "%{$searchValue}%");
+                $q->whereLike('name', "%{$searchValue}%")
+                    ->orWhereLike('slug', "%{$searchValue}%");
             });
         }
 

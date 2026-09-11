@@ -31,6 +31,8 @@ final class ClientInvoiceMail extends Mailable
 
     private const FALLBACK_TEMPLATE = 'emails.invoices.default';
 
+    private const FALLBACK_TEXT_TEMPLATE = 'emails.invoices.default-text';
+
     public function __construct(public Invoice $invoice) {}
 
     public function envelope(): Envelope
@@ -60,10 +62,11 @@ final class ClientInvoiceMail extends Mailable
     public function content(): Content
     {
         $business = $this->invoice->business_snapshot ?? [];
+        $template = $this->templateFor();
 
         return new Content(
-            view: $this->templateFor(),
-            text: 'emails.invoices.default-text',
+            view: $template,
+            text: $this->textTemplateFor($template),
             with: [
                 'invoice' => $this->invoice,
                 'businessName' => $business['name'] ?? $this->invoice->business->name,
@@ -103,5 +106,21 @@ final class ClientInvoiceMail extends Mailable
         return filled($snapshot) && view()->exists($snapshot)
             ? $snapshot
             : self::FALLBACK_TEMPLATE;
+    }
+
+    /**
+     * The plain-text companion sitting beside the chosen template.
+     *
+     * The registry treats a `-text` file as a companion of its template rather
+     * than a choice of its own, so the pairing is by name. A template that
+     * ships without one falls back to the default's text part: a mismatched
+     * plain-text body is worse than the default, but both beat sending an
+     * HTML-only invoice to a client whose reader shows text.
+     */
+    private function textTemplateFor(string $template): string
+    {
+        $companion = $template.'-text';
+
+        return view()->exists($companion) ? $companion : self::FALLBACK_TEXT_TEMPLATE;
     }
 }

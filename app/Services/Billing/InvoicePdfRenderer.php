@@ -28,6 +28,7 @@ final class InvoicePdfRenderer
         private readonly ViewFactory $views,
         private readonly BusinessLogoStore $logos,
         private readonly InvoiceFontStore $fonts,
+        private readonly DocumentKitStore $kits,
     ) {}
 
     /**
@@ -42,7 +43,9 @@ final class InvoicePdfRenderer
      */
     public function html(Invoice $invoice, array $extra = []): string
     {
-        return $this->views->make($this->templateFor($invoice), array_merge([
+        $template = $this->templateFor($invoice);
+
+        return $this->views->make($template, array_merge([
             'invoice' => $invoice->loadMissing(['topLevelLines.children', 'business', 'client', 'payments']),
 
             // Inlined rather than linked: Browsershot renders from an HTML
@@ -50,9 +53,15 @@ final class InvoicePdfRenderer
             // nothing and the logo would vanish from every PDF.
             'logoDataUri' => $this->logos->dataUri($invoice->business_snapshot['logo_path'] ?? null),
 
-            // Same reasoning as the logo, for the same reason: a linked
+            // Scoped to the template so an invoice carries only the faces it
+            // sets its own text in, rather than every family the application
+            // has vendored for every template.
+            'fontFaceCss' => $this->fonts->faceCss($template),
+
+            // Empty for a template that brings its own CSS, as the default one
+            // does. Same reasoning as the logo and the fonts: a linked
             // stylesheet is not dependable from a bare HTML string.
-            'fontFaceCss' => $this->fonts->faceCss(),
+            'kitCss' => $this->kits->cssFor($template),
         ], $extra))->render();
     }
 
