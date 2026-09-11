@@ -8,20 +8,31 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Billing\StoreBusinessRequest;
 use App\Http\Requests\Billing\UpdateBusinessRequest;
 use App\Models\Billing\Business;
+use App\Models\Billing\LegalEntity;
 use App\Services\AuditLogger;
+use App\Services\Billing\BusinessLogoStore;
+use App\Services\Billing\InvoiceTemplateRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 final class BusinessController extends Controller
 {
-    public function __construct(private readonly AuditLogger $audit) {}
+    public function __construct(
+        private readonly AuditLogger $audit,
+        private readonly BusinessLogoStore $logos,
+        private readonly InvoiceTemplateRegistry $templates,
+    ) {}
 
     public function index(): View
     {
         $this->authorize('viewAny', Business::class);
 
-        return view('admin-v2.billing.businesses.index');
+        return view('admin-v2.billing.businesses.index', [
+            'legalEntities' => LegalEntity::query()->orderBy('name')->pluck('name', 'id')->all(),
+            'invoiceTemplates' => $this->templates->invoiceTemplates(),
+            'emailTemplates' => $this->templates->emailTemplates(),
+        ]);
     }
 
     public function data(Request $request): JsonResponse
@@ -33,13 +44,13 @@ final class BusinessController extends Controller
         $length = (int) $request->input('length', 25);
         $searchValue = (string) $request->input('search.value', '');
 
-        $query = Business::query()->withCount(['clients', 'costProviders']);
+        $query = Business::query()->with('legalEntity')->withCount(['clients', 'costProviders']);
 
         if ($searchValue !== '') {
             $query->where(function ($q) use ($searchValue): void {
-                $q->where('name', 'like', "%{$searchValue}%")
-                    ->orWhere('legal_name', 'like', "%{$searchValue}%")
-                    ->orWhere('contact_email', 'like', "%{$searchValue}%");
+                $q->whereLike('name', "%{$searchValue}%")
+                    ->orWhereLike('legal_name', "%{$searchValue}%")
+                    ->orWhereLike('contact_email', "%{$searchValue}%");
             });
         }
 
@@ -55,9 +66,11 @@ final class BusinessController extends Controller
             'default_currency' => e($business->default_currency),
             'clients_count' => $business->clients_count,
             'providers_count' => $business->cost_providers_count,
-            'tax_registered' => $business->tax_registered_from
-                ? '<span class="badge bg-success">Registered</span>'
-                : '<span class="badge bg-default">Unregistered</span>',
+            'legal_entity' => $business->legalEntity === null
+                ? '<span class="badge bg-warning">Not set</span>'
+                : e($business->legalEntity->name).' '.($business->legalEntity->tax_registered_from
+                    ? '<span class="badge bg-success">GST/HST</span>'
+                    : '<span class="badge bg-default">Unregistered</span>'),
             'actions' => view('admin-v2.billing.businesses.partials.actions', ['business' => $business])->render(),
         ]);
 
@@ -72,6 +85,11 @@ final class BusinessController extends Controller
     public function store(StoreBusinessRequest $request): JsonResponse
     {
         $business = Business::create($request->validated());
+
+        if ($request->hasFile('logo')) {
+            $business->forceFill(['logo_id' => $this->logos->store($request->file('logo'))])->save();
+        }
+
         $this->audit->logCreated($business, ['billing', 'business']);
 
         return response()->json([
@@ -100,9 +118,15 @@ final class BusinessController extends Controller
                 'default_currency' => $business->default_currency,
                 'supported_currencies' => $business->supported_currencies ?? ['CAD'],
                 'fx_source' => $business->fx_source,
-                'tax_registered_from' => $business->tax_registered_from?->format('Y-m-d'),
+                'legal_entity_id' => $business->legal_entity_id,
                 'daily_reminder_time' => substr((string) $business->daily_reminder_time, 0, 5),
                 'late_fee_terms' => $business->late_fee_terms,
+                'payment_terms_days' => $business->payment_terms_days,
+                'cheque_payable_to' => $business->cheque_payable_to,
+                'invoice_template_view' => $business->invoice_template_view,
+                'email_template_view' => $business->email_template_view,
+                'has_logo' => $business->logo_id !== null,
+                'logo_preview' => $this->logos->dataUri($business->logo_id),
             ],
         ]);
     }
@@ -111,6 +135,15 @@ final class BusinessController extends Controller
     {
         $original = $business->getOriginal();
         $business->update($request->validated());
+
+        // Uploads never overwrite, so an invoice that snapshotted the old logo
+        // keeps rendering the logo it was issued with. The old row stays.
+        if ($request->hasFile('logo')) {
+            $business->forceFill(['logo_id' => $this->logos->store($request->file('logo'))])->save();
+        } elseif ($request->boolean('remove_logo')) {
+            $business->forceFill(['logo_id' => null])->save();
+        }
+
         $this->audit->logUpdated($business, $original, ['billing', 'business']);
 
         return response()->json([

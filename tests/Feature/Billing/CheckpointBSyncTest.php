@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Billing;
 
 use App\Enums\Billing\SyncStatus;
-use App\Jobs\Billing\SyncDigitalOceanProjectsJob;
+use App\Jobs\Billing\SyncProviderResourcesJob;
 use App\Models\Billing\Business;
 use App\Models\Billing\Client;
 use App\Models\Billing\CostProvider;
@@ -15,6 +15,7 @@ use App\Models\Billing\ResourceAssignment;
 use App\Services\Billing\DigitalOcean\Client as DoClient;
 use App\Services\Billing\DigitalOcean\Dto\DoResource;
 use App\Services\Billing\DigitalOcean\ProjectSync;
+use App\Services\Billing\ProviderAdapterRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
@@ -200,7 +201,7 @@ final class CheckpointBSyncTest extends TestCase
     {
         $provider = CostProvider::factory()->create(['enabled' => false]);
 
-        (new SyncDigitalOceanProjectsJob($provider->id))->handle(app(ProjectSync::class));
+        (new SyncProviderResourcesJob($provider->id))->handle(app(ProviderAdapterRegistry::class));
 
         $this->assertSame(SyncStatus::Never, $provider->fresh()->last_sync_status);
     }
@@ -211,11 +212,11 @@ final class CheckpointBSyncTest extends TestCase
 
         $provider = CostProvider::factory()->create();
 
-        SyncDigitalOceanProjectsJob::dispatch($provider->id);
+        SyncProviderResourcesJob::dispatch($provider->id);
 
         Bus::assertDispatched(
-            SyncDigitalOceanProjectsJob::class,
-            fn (SyncDigitalOceanProjectsJob $job) => $job->costProviderId === $provider->id,
+            SyncProviderResourcesJob::class,
+            fn (SyncProviderResourcesJob $job) => $job->costProviderId === $provider->id,
         );
     }
 

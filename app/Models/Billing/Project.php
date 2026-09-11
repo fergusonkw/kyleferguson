@@ -6,6 +6,7 @@ namespace App\Models\Billing;
 
 use App\Enums\Billing\MarkupType;
 use App\Enums\Billing\ProjectStatus;
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $do_project_uuid
  * @property MarkupType|null $markup_type
  * @property string|null $markup_value
+ * @property string|null $markup_fee
  * @property ProjectStatus $status
  * @property \Illuminate\Support\Carbon|null $terminated_at
  * @property string|null $notes
@@ -25,6 +27,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read Client $client
  * @property-read \Illuminate\Database\Eloquent\Collection<int, ProviderResource> $providerResources
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, CostLineItem> $costLineItems
  *
  * @method static \Database\Factories\Billing\ProjectFactory factory($count = null, $state = [])
  *
@@ -42,6 +45,7 @@ final class Project extends Model
         'do_project_uuid',
         'markup_type',
         'markup_value',
+        'markup_fee',
         'status',
         'terminated_at',
         'notes',
@@ -59,6 +63,18 @@ final class Project extends Model
         return $this->hasMany(ProviderResource::class);
     }
 
+    /** @return HasMany<CostLineItem, $this> */
+    public function costLineItems(): HasMany
+    {
+        return $this->hasMany(CostLineItem::class);
+    }
+
+    /** @return HasMany<RecurringLineTemplate, $this> */
+    public function recurringLineTemplates(): HasMany
+    {
+        return $this->hasMany(RecurringLineTemplate::class);
+    }
+
     /**
      * The markup type effective for this project (falls back to client default).
      */
@@ -68,11 +84,47 @@ final class Project extends Model
     }
 
     /**
-     * The markup value effective for this project (falls back to client default).
+     * The markup percent effective for this project (falls back to client default).
      */
     public function effectiveMarkupValue(): string
     {
         return $this->markup_value ?? $this->client->default_markup_value;
+    }
+
+    /**
+     * The flat markup fee effective for this project (falls back to client default).
+     */
+    public function effectiveMarkupFee(): string
+    {
+        return $this->markup_fee ?? $this->client->default_markup_fee;
+    }
+
+    /**
+     * Whether the project had already ended when the given period began.
+     *
+     * Termination stops standing charges from the next period onward rather
+     * than immediately: a project ended mid-month is still owed for the month
+     * it ran, and cutting the final invoice short would under-bill it.
+     */
+    public function hadTerminatedBefore(DateTimeInterface $periodStart): bool
+    {
+        if ($this->terminated_at === null) {
+            return false;
+        }
+
+        return $this->terminated_at->lessThan($periodStart);
+    }
+
+    /**
+     * Apply this project's effective markup to a cost in the issue currency.
+     */
+    public function applyMarkup(string $cost): string
+    {
+        return $this->effectiveMarkupType()->apply(
+            $cost,
+            $this->effectiveMarkupValue(),
+            $this->effectiveMarkupFee(),
+        );
     }
 
     /**
@@ -83,6 +135,7 @@ final class Project extends Model
         return [
             'markup_type' => MarkupType::class,
             'markup_value' => 'decimal:4',
+            'markup_fee' => 'decimal:4',
             'status' => ProjectStatus::class,
             'terminated_at' => 'datetime',
         ];

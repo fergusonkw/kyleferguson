@@ -2,6 +2,7 @@
     'type' => 'info',
     'dismissible' => false,
     'title' => null,
+    'message' => null,
 ])
 
 @php
@@ -24,6 +25,7 @@
         @if($title)
             <p class="font-semibold mb-0.5">{{ $title }}</p>
         @endif
+        {{ $message }}
         {{ $slot }}
     </div>
 

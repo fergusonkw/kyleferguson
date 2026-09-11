@@ -131,6 +131,19 @@
     let failedJobsCurrentPage = 1;
     const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
 
+    // Built from named routes. These endpoints live under the /admin prefix,
+    // and hardcoding the paths without it silently 404'd every panel on this
+    // page — the tables just rendered their error state forever.
+    const URLS = {
+        queues: @json(route('admin.queue-monitor.queues'), JSON_UNESCAPED_SLASHES),
+        jobs: @json(route('admin.queue-monitor.jobs'), JSON_UNESCAPED_SLASHES),
+        failedJobs: @json(route('admin.queue-monitor.failed-jobs'), JSON_UNESCAPED_SLASHES),
+        retryAll: @json(route('admin.queue-monitor.retry-all'), JSON_UNESCAPED_SLASHES),
+        flush: @json(route('admin.queue-monitor.flush'), JSON_UNESCAPED_SLASHES),
+        retry: (uuid) => @json(route('admin.queue-monitor.retry', ['uuid' => '__UUID__']), JSON_UNESCAPED_SLASHES).replace('__UUID__', encodeURIComponent(uuid)),
+        remove: (uuid) => @json(route('admin.queue-monitor.delete', ['uuid' => '__UUID__']), JSON_UNESCAPED_SLASHES).replace('__UUID__', encodeURIComponent(uuid)),
+    };
+
     // Tab switching
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', function () {
@@ -165,7 +178,7 @@
     });
 
     function loadQueues() {
-        fetch('/queue-monitor/queues').then(r => r.json()).then(queues => {
+        fetch(URLS.queues).then(r => r.json()).then(queues => {
             const activeSelect = document.getElementById('activeQueueFilter');
             const failedSelect = document.getElementById('failedQueueFilter');
             queues.forEach(queue => {
@@ -178,7 +191,7 @@
     function loadActiveJobs(page = 1) {
         activeJobsCurrentPage = page;
         const queue = document.getElementById('activeQueueFilter').value;
-        fetch(`/queue-monitor/jobs?page=${page}${queue ? `&queue=${queue}` : ''}`)
+        fetch(`${URLS.jobs}?page=${page}${queue ? `&queue=${queue}` : ''}`)
             .then(r => r.json())
             .then(data => { renderActiveJobs(data.data); renderPagination(data, 'activeJobsPagination', loadActiveJobs); })
             .catch(() => { document.getElementById('activeJobsBody').innerHTML = '<tr><td colspan="7" class="text-center text-danger">Error loading jobs</td></tr>'; });
@@ -187,7 +200,7 @@
     function loadFailedJobs(page = 1) {
         failedJobsCurrentPage = page;
         const queue = document.getElementById('failedQueueFilter').value;
-        fetch(`/queue-monitor/failed-jobs?page=${page}${queue ? `&queue=${queue}` : ''}`)
+        fetch(`${URLS.failedJobs}?page=${page}${queue ? `&queue=${queue}` : ''}`)
             .then(r => r.json())
             .then(data => { renderFailedJobs(data.data); renderPagination(data, 'failedJobsPagination', loadFailedJobs); })
             .catch(() => { document.getElementById('failedJobsBody').innerHTML = '<tr><td colspan="5" class="text-center text-danger">Error loading failed jobs</td></tr>'; });
@@ -278,22 +291,22 @@
     });
 
     function retryJob(uuid) {
-        fetch(`/queue-monitor/failed-jobs/${uuid}/retry`, { method: 'POST', headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' } })
+        fetch(URLS.retry(uuid), { method: 'POST', headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' } })
             .then(r => r.json()).then(data => { Alert.toast(data.message, 'success'); loadFailedJobs(failedJobsCurrentPage); loadActiveJobs(activeJobsCurrentPage); })
             .catch(() => Alert.error('Failed to retry job'));
     }
     function deleteJob(uuid) {
-        fetch(`/queue-monitor/failed-jobs/${uuid}`, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' } })
+        fetch(URLS.remove(uuid), { method: 'DELETE', headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' } })
             .then(r => r.json()).then(data => { Alert.toast(data.message, 'success'); loadFailedJobs(failedJobsCurrentPage); })
             .catch(() => Alert.error('Failed to delete job'));
     }
     function retryAllFailedJobs() {
-        fetch('/queue-monitor/failed-jobs/retry-all', { method: 'POST', headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' } })
+        fetch(URLS.retryAll, { method: 'POST', headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' } })
             .then(r => r.json()).then(data => { Alert.toast(data.message, 'success'); loadFailedJobs(1); loadActiveJobs(1); })
             .catch(() => Alert.error('Failed to retry jobs'));
     }
     function flushFailedJobs() {
-        fetch('/queue-monitor/failed-jobs', { method: 'DELETE', headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' } })
+        fetch(URLS.flush, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' } })
             .then(r => r.json()).then(data => { Alert.toast(data.message, 'success'); loadFailedJobs(1); })
             .catch(() => Alert.error('Failed to delete jobs'));
     }

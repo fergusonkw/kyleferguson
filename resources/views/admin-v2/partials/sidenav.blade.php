@@ -119,6 +119,15 @@
                     </li>
                     @endcan
 
+                    @can('viewAny', App\Models\Billing\LegalEntity::class)
+                    <li class="menu-item">
+                        <a href="{{ route('admin.billing.legal-entities.index') }}" class="menu-link">
+                            <span class="menu-icon"><i data-lucide="landmark"></i></span>
+                            <span class="menu-text">Legal Entities</span>
+                        </a>
+                    </li>
+                    @endcan
+
                     @can('viewAny', App\Models\Billing\Client::class)
                     <li class="menu-item">
                         <a href="{{ route('admin.billing.clients.index') }}" class="menu-link">
@@ -145,6 +154,40 @@
                         </a>
                     </li>
                     @endcan
+
+                    @can('viewAny', App\Models\Billing\Invoice::class)
+                    <li class="menu-item">
+                        <a href="{{ route('admin.billing.invoices.index') }}" class="menu-link">
+                            <span class="menu-icon"><i data-lucide="receipt"></i></span>
+                            <span class="menu-text">Invoices</span>
+                        </a>
+                    </li>
+                    @endcan
+
+                    @can('viewAny', App\Models\Billing\RecurringLineTemplate::class)
+                    <li class="menu-item">
+                        <a href="{{ route('admin.billing.recurring-lines.index') }}" class="menu-link">
+                            <span class="menu-icon"><i data-lucide="rotate-cw"></i></span>
+                            <span class="menu-text">Recurring Items</span>
+                        </a>
+                    </li>
+                    @endcan
+
+                    @can('viewAny', App\Models\Billing\Invoice::class)
+                    <li class="menu-item">
+                        <a href="{{ route('admin.billing.receivables.index') }}" class="menu-link">
+                            <span class="menu-icon"><i data-lucide="hand-coins"></i></span>
+                            <span class="menu-text">Receivables</span>
+                        </a>
+                    </li>
+                    @endcan
+
+                    <li class="menu-item">
+                        <a href="{{ route('admin.billing.reconciliation.index') }}" class="menu-link">
+                            <span class="menu-icon"><i data-lucide="scale"></i></span>
+                            <span class="menu-text">Reconciliation</span>
+                        </a>
+                    </li>
                     @endcan
 
                 </ul>

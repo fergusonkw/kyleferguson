@@ -22,11 +22,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property ClientStatus $status
  * @property MarkupType $default_markup_type
  * @property string $default_markup_value
+ * @property string $default_markup_fee
  * @property string|null $notes
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read Business $business
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Project> $projects
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, Invoice> $invoices
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, RecurringLineTemplate> $recurringLineTemplates
  *
  * @method static \Database\Factories\Billing\ClientFactory factory($count = null, $state = [])
  *
@@ -48,6 +51,7 @@ final class Client extends Model
         'status',
         'default_markup_type',
         'default_markup_value',
+        'default_markup_fee',
         'notes',
     ];
 
@@ -63,6 +67,18 @@ final class Client extends Model
         return $this->hasMany(Project::class);
     }
 
+    /** @return HasMany<Invoice, $this> */
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class);
+    }
+
+    /** @return HasMany<RecurringLineTemplate, $this> */
+    public function recurringLineTemplates(): HasMany
+    {
+        return $this->hasMany(RecurringLineTemplate::class);
+    }
+
     /**
      * @return array<string, string>
      */
@@ -72,6 +88,7 @@ final class Client extends Model
             'status' => ClientStatus::class,
             'default_markup_type' => MarkupType::class,
             'default_markup_value' => 'decimal:4',
+            'default_markup_fee' => 'decimal:4',
         ];
     }
 }

@@ -8,17 +8,25 @@ use App\Enums\Permission;
 use App\Models\Billing\Business;
 use App\Models\Billing\Client as BillingClient;
 use App\Models\Billing\CostProvider;
+use App\Models\Billing\Invoice;
+use App\Models\Billing\LegalEntity;
 use App\Models\Billing\Project;
+use App\Models\Billing\RecurringLineTemplate;
 use App\Models\Role;
 use App\Models\User;
 use App\Policies\Billing\BusinessPolicy;
 use App\Policies\Billing\ClientPolicy as BillingClientPolicy;
 use App\Policies\Billing\CostProviderPolicy;
+use App\Policies\Billing\InvoicePolicy;
+use App\Policies\Billing\LegalEntityPolicy;
 use App\Policies\Billing\ProjectPolicy;
+use App\Policies\Billing\RecurringLineTemplatePolicy;
 use App\Policies\RolePolicy;
 use App\Policies\UserPolicy;
 use App\Services\AuditLogger;
 use App\Services\Billing\CurrentBusiness;
+use App\Services\Billing\InvoiceFontStore;
+use App\Services\Billing\Pdf\RetryingCloudflareDriver;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -31,6 +39,17 @@ final class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(AuditLogger::class);
         $this->app->singleton(CurrentBusiness::class);
+
+        // Singleton so the ~90KB of webfont carried by every invoice is read
+        // and base64-encoded once per process, not once per document.
+        $this->app->singleton(InvoiceFontStore::class);
+
+        // Replaces laravel-pdf's own Cloudflare driver, which fails on the
+        // free plan's one-request-per-ten-seconds limit instead of waiting.
+        // Registered after the package's provider, so this binding wins.
+        $this->app->singleton('laravel-pdf.driver.cloudflare', fn (): RetryingCloudflareDriver => new RetryingCloudflareDriver(
+            config('laravel-pdf.cloudflare', []),
+        ));
     }
 
     public function boot(): void
@@ -40,9 +59,12 @@ final class AppServiceProvider extends ServiceProvider
         Gate::policy(User::class, UserPolicy::class);
         Gate::policy(Role::class, RolePolicy::class);
         Gate::policy(Business::class, BusinessPolicy::class);
+        Gate::policy(LegalEntity::class, LegalEntityPolicy::class);
         Gate::policy(BillingClient::class, BillingClientPolicy::class);
         Gate::policy(Project::class, ProjectPolicy::class);
         Gate::policy(CostProvider::class, CostProviderPolicy::class);
+        Gate::policy(Invoice::class, InvoicePolicy::class);
+        Gate::policy(RecurringLineTemplate::class, RecurringLineTemplatePolicy::class);
 
         // Permission-backed gates for resources without an Eloquent model.
         Gate::define('viewAny-audit-logs', fn (User $user) => $user->hasPermission(Permission::ViewAuditLogs->value));

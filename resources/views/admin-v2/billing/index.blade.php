@@ -35,7 +35,44 @@
         </x-admin-v2.card>
     @endisset
 
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 mt-5">
+    @isset($receivables)
+        <div class="flex items-center justify-between mt-8 mb-3">
+            <h5 class="text-sm font-semibold text-default-500 uppercase">Money owed</h5>
+            <a href="{{ route('admin.billing.receivables.index') }}" class="text-sm text-primary">Receivables →</a>
+        </div>
+
+        @if($receivables->hasOverdue())
+            <x-admin-v2.alert
+                type="danger"
+                message="{{ $receivables->overdueCount }} invoice(s) are past due, the oldest by {{ $receivables->oldestOverdueDays }} days."
+            />
+        @elseif($receivables->awaitingSendCount > 0)
+            <x-admin-v2.alert
+                type="warning"
+                message="{{ $receivables->awaitingSendCount }} approved invoice(s) have not been sent to the client yet."
+            />
+        @endif
+
+        <x-admin-v2.billing.receivable-cards :summary="$receivables" />
+    @endisset
+
+    @isset($threshold)
+        <x-admin-v2.billing.threshold-card :assessment="$threshold" />
+    @endisset
+
+    @if(isset($currentBusiness) && $currentBusiness->legal_entity_id === null)
+        <x-admin-v2.alert
+            type="warning"
+            class="mt-8"
+            message="{{ $currentBusiness->name }} has no legal entity, so the GST/HST threshold is not being tracked for it. Set one on the business."
+        />
+    @endif
+
+    <div class="flex items-center justify-between mt-8 mb-3">
+        <h5 class="text-sm font-semibold text-default-500 uppercase">Configuration</h5>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
         <x-admin-v2.stat-card
             title="Businesses"
             icon="briefcase-business"
@@ -66,10 +103,72 @@
         />
     </div>
 
-    <x-admin-v2.card class="mt-5">
-        <p class="text-sm text-default-500">
-            Phase 1 brings the foundation: businesses, clients, projects, cost providers, and the DigitalOcean
-            sync. Cost ingestion, invoice generation, and reconciliation arrive in phases 2 and 3.
-        </p>
-    </x-admin-v2.card>
+    @isset($summary)
+        @php
+            $money = fn (?float $value): string => $value === null ? '—' : '$'.number_format($value, 2);
+        @endphp
+
+        <div class="flex items-center justify-between mt-8 mb-3">
+            <h5 class="text-sm font-semibold text-default-500 uppercase">Costs · {{ $periodLabel }}</h5>
+            <a href="{{ route('admin.billing.reconciliation.index', ['period' => $period]) }}"
+               class="text-sm text-primary">Reconciliation →</a>
+        </div>
+
+        @if($summary->needsAttention())
+            <x-admin-v2.alert
+                type="warning"
+                message="Some costs this period are not attributed to a project yet and will not reach a client invoice."
+            />
+        @endif
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <x-admin-v2.stat-card
+                title="Attributed"
+                icon="circle-check"
+                :primaryStatistic="$money($summary->attributedCost)"
+                :animateCounter="false"
+                secondaryTitle="Billable to projects"
+                secondaryColor="success"
+            />
+            <x-admin-v2.stat-card
+                title="Unattributed"
+                icon="circle-help"
+                :primaryStatistic="$money($summary->unattributedCost)"
+                :animateCounter="false"
+                :secondaryTitle="$summary->unattributedResourceCount . ' resource(s) unassigned'"
+                :secondaryColor="$summary->unattributedResourceCount > 0 ? 'warning' : 'success'"
+            />
+            <x-admin-v2.stat-card
+                title="Overhead"
+                icon="building-2"
+                :primaryStatistic="$money($summary->overheadCost)"
+                :animateCounter="false"
+                secondaryTitle="Absorbed, not billed on"
+                secondaryColor="info"
+            />
+        </div>
+
+        @if($trailingCost->isNotEmpty())
+            <x-admin-v2.card title="Trailing 12-month cost" class="mt-5">
+                <p class="text-sm text-default-500 mb-4">
+                    Ingested cost basis per period, in USD. This is what the work cost, not what was
+                    billed — revenue against the GST/HST threshold is tracked above.
+                </p>
+                <div class="overflow-x-auto">
+                    <div class="flex items-end gap-2 min-w-[480px] h-32">
+                        @php($peak = max($trailingCost->max('cost'), 0.01))
+                        @foreach($trailingCost as $month)
+                            <div class="flex-1 flex flex-col items-center justify-end h-full gap-1">
+                                <span class="text-[10px] text-default-400">{{ $month['cost'] > 0 ? number_format($month['cost'], 0) : '' }}</span>
+                                <div class="w-full bg-primary/70 rounded-t"
+                                     style="height: {{ max(2, (int) round(($month['cost'] / $peak) * 90)) }}%"
+                                     title="{{ $month['period'] }}: {{ $money($month['cost']) }}"></div>
+                                <span class="text-[10px] text-default-400">{{ substr($month['period'], 5) }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            </x-admin-v2.card>
+        @endif
+    @endisset
 @endsection

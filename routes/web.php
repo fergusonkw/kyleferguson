@@ -8,7 +8,13 @@ use App\Http\Controllers\Admin\Billing\BusinessController;
 use App\Http\Controllers\Admin\Billing\BusinessSwitcherController;
 use App\Http\Controllers\Admin\Billing\ClientController as BillingClientController;
 use App\Http\Controllers\Admin\Billing\CostProviderController;
+use App\Http\Controllers\Admin\Billing\InvoiceController;
+use App\Http\Controllers\Admin\Billing\LegalEntityController;
+use App\Http\Controllers\Admin\Billing\PaymentController;
 use App\Http\Controllers\Admin\Billing\ProjectController as BillingProjectController;
+use App\Http\Controllers\Admin\Billing\ReceivablesController;
+use App\Http\Controllers\Admin\Billing\ReconciliationController;
+use App\Http\Controllers\Admin\Billing\RecurringLineTemplateController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\LogViewerController;
 use App\Http\Controllers\Admin\MaintenanceController;
@@ -20,6 +26,7 @@ use App\Http\Controllers\Admin\UserSettingsController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\TwoFactorChallengeController;
+use App\Http\Controllers\HostedInvoiceController;
 use Illuminate\Support\Facades\Route;
 
 // The marketing site lives as static files in public/index.html. Apache
@@ -29,6 +36,16 @@ use Illuminate\Support\Facades\Route;
 Route::post('/contact', [App\Http\Controllers\ContactController::class, 'submit'])
     ->middleware('throttle:contact')
     ->name('contact.submit');
+
+// Client-facing invoice, reached by the unguessable token in the emailed link.
+// No login: asking a client to create an account to read an invoice is a good
+// way not to get paid. Throttled so the token space cannot be probed.
+Route::middleware('throttle:30,1')->group(function (): void {
+    Route::get('/invoices/{token}', [HostedInvoiceController::class, 'show'])
+        ->name('invoices.hosted.show');
+    Route::get('/invoices/{token}/pdf', [HostedInvoiceController::class, 'pdf'])
+        ->name('invoices.hosted.pdf');
+});
 
 // Guest authentication
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
@@ -127,6 +144,15 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'email.verified', '2
         Route::put('businesses/{business}', [BusinessController::class, 'update'])->name('businesses.update');
         Route::delete('businesses/{business}', [BusinessController::class, 'destroy'])->name('businesses.destroy');
 
+        // Legal entities
+        Route::get('legal-entities', [LegalEntityController::class, 'index'])->name('legal-entities.index');
+        Route::get('legal-entities/data', [LegalEntityController::class, 'data'])->name('legal-entities.data');
+        Route::get('legal-entities/options', [LegalEntityController::class, 'options'])->name('legal-entities.options');
+        Route::post('legal-entities', [LegalEntityController::class, 'store'])->name('legal-entities.store');
+        Route::get('legal-entities/{legalEntity}/edit', [LegalEntityController::class, 'edit'])->name('legal-entities.edit');
+        Route::put('legal-entities/{legalEntity}', [LegalEntityController::class, 'update'])->name('legal-entities.update');
+        Route::delete('legal-entities/{legalEntity}', [LegalEntityController::class, 'destroy'])->name('legal-entities.destroy');
+
         // Clients
         Route::get('clients', [BillingClientController::class, 'index'])->name('clients.index');
         Route::get('clients/data', [BillingClientController::class, 'data'])->name('clients.data');
@@ -146,6 +172,47 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'email.verified', '2
         Route::put('projects/{project}', [BillingProjectController::class, 'update'])->name('projects.update');
         Route::delete('projects/{project}', [BillingProjectController::class, 'destroy'])->name('projects.destroy');
 
+        // Invoices
+        Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices.index');
+        Route::get('invoices/data', [InvoiceController::class, 'data'])->name('invoices.data');
+        Route::get('invoices/available-clients', [InvoiceController::class, 'availableClients'])->name('invoices.available-clients');
+        Route::post('invoices/generate', [InvoiceController::class, 'generate'])->name('invoices.generate');
+        Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
+        Route::get('invoices/{invoice}/preview', [InvoiceController::class, 'preview'])->name('invoices.preview');
+        Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'downloadPdf'])->name('invoices.pdf');
+        Route::get('invoices/{invoice}/pdf/issued', [InvoiceController::class, 'downloadIssuedPdf'])->name('invoices.pdf.issued');
+        Route::post('invoices/{invoice}/regenerate', [InvoiceController::class, 'regenerate'])->name('invoices.regenerate');
+        Route::post('invoices/{invoice}/approve', [InvoiceController::class, 'approve'])->name('invoices.approve');
+        Route::post('invoices/{invoice}/sent', [InvoiceController::class, 'markSent'])->name('invoices.sent');
+        Route::post('invoices/{invoice}/resend', [InvoiceController::class, 'resend'])->name('invoices.resend');
+        Route::post('invoices/{invoice}/void', [InvoiceController::class, 'void'])->name('invoices.void');
+        Route::post('invoices/{invoice}/rotate-link', [InvoiceController::class, 'rotateLink'])->name('invoices.rotate-link');
+        Route::patch('invoices/{invoice}/due-date', [InvoiceController::class, 'updateDueDate'])->name('invoices.due-date');
+        Route::delete('invoices/{invoice}', [InvoiceController::class, 'destroy'])->name('invoices.destroy');
+        Route::post('invoices/{invoice}/lines', [InvoiceController::class, 'storeLine'])->name('invoices.lines.store');
+        Route::get('invoices/{invoice}/lines/{line}/edit', [InvoiceController::class, 'editLine'])->name('invoices.lines.edit');
+        Route::patch('invoices/{invoice}/lines/{line}', [InvoiceController::class, 'updateLine'])->name('invoices.lines.update');
+        Route::delete('invoices/{invoice}/lines/{line}', [InvoiceController::class, 'destroyLine'])->name('invoices.lines.destroy');
+        Route::post('invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('invoices.payments.store');
+        Route::delete('invoices/{invoice}/payments/{payment}', [PaymentController::class, 'destroy'])->name('invoices.payments.destroy');
+
+        // Recurring line templates
+        Route::get('recurring-lines', [RecurringLineTemplateController::class, 'index'])->name('recurring-lines.index');
+        Route::get('recurring-lines/data', [RecurringLineTemplateController::class, 'data'])->name('recurring-lines.data');
+        Route::get('recurring-lines/targets', [RecurringLineTemplateController::class, 'targets'])->name('recurring-lines.targets');
+        Route::post('recurring-lines', [RecurringLineTemplateController::class, 'store'])->name('recurring-lines.store');
+        Route::get('recurring-lines/{recurringLineTemplate}/edit', [RecurringLineTemplateController::class, 'edit'])->name('recurring-lines.edit');
+        Route::put('recurring-lines/{recurringLineTemplate}', [RecurringLineTemplateController::class, 'update'])->name('recurring-lines.update');
+        Route::delete('recurring-lines/{recurringLineTemplate}', [RecurringLineTemplateController::class, 'destroy'])->name('recurring-lines.destroy');
+
+        // Receivables
+        Route::get('receivables', [ReceivablesController::class, 'index'])->name('receivables.index');
+
+        // Reconciliation
+        Route::get('reconciliation', [ReconciliationController::class, 'index'])->name('reconciliation.index');
+        Route::get('reconciliation/line-items', [ReconciliationController::class, 'lineItems'])->name('reconciliation.line-items');
+        Route::post('reconciliation/attribute', [ReconciliationController::class, 'attribute'])->name('reconciliation.attribute');
+
         // Cost providers
         Route::get('cost-providers', [CostProviderController::class, 'index'])->name('cost-providers.index');
         Route::get('cost-providers/data', [CostProviderController::class, 'data'])->name('cost-providers.data');
@@ -153,6 +220,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'email.verified', '2
         Route::get('cost-providers/{costProvider}/edit', [CostProviderController::class, 'edit'])->name('cost-providers.edit');
         Route::put('cost-providers/{costProvider}', [CostProviderController::class, 'update'])->name('cost-providers.update');
         Route::delete('cost-providers/{costProvider}', [CostProviderController::class, 'destroy'])->name('cost-providers.destroy');
+        Route::get('cost-providers/available-clients', [CostProviderController::class, 'availableClients'])->name('cost-providers.available-clients');
         Route::post('cost-providers/{costProvider}/sync', [CostProviderController::class, 'sync'])->name('cost-providers.sync');
+        Route::post('cost-providers/{costProvider}/sync-billing', [CostProviderController::class, 'syncBilling'])->name('cost-providers.sync-billing');
     });
 });
