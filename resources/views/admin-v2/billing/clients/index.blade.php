@@ -59,12 +59,20 @@
 
             <hr class="border-default-200 my-4">
             <p class="text-xs font-semibold uppercase text-default-400 tracking-wider mb-3">Default Markup (projects inherit unless overridden)</p>
+            <x-admin-v2.form.select name="default_markup_type" label="Markup Type" :required="true" :options="$markupOptions" />
             <div class="grid grid-cols-2 gap-3">
-                <x-admin-v2.form.select name="default_markup_type" label="Markup Type" :required="true" :options="$markupOptions" />
-                <x-admin-v2.form.input name="default_markup_value" type="number" step="0.0001" min="0" label="Markup Value" :required="true" placeholder="0" />
+                <div data-markup-field="percent">
+                    <x-admin-v2.form.input name="default_markup_value" type="number" step="0.0001" min="0"
+                                           label="Markup %" placeholder="15" />
+                </div>
+                <div data-markup-field="fee">
+                    <x-admin-v2.form.input name="default_markup_fee" type="number" step="0.01" min="0"
+                                           label="Fixed Fee" placeholder="0.00" />
+                </div>
             </div>
-            <p class="text-xs text-default-400 -mt-2 mb-3">
-                Percent → %; Fixed/Hybrid → CAD; Pass-through → leave 0.
+            <p class="text-xs text-default-400 -mt-2 mb-3" data-markup-hint>
+                Markup applies to hosting costs only, after they are converted to the client's billing
+                currency. Recurring and manual lines are entered at the price you charge.
             </p>
 
             <hr class="border-default-200 my-4">
@@ -93,7 +101,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function populate (c) {
         for (const k of ['name','contact_name','contact_email','billing_address','billing_currency',
-            'status','default_markup_type','default_markup_value','notes']) {
+            'status','default_markup_type','default_markup_value','default_markup_fee','notes']) {
             const el = document.querySelector(`[name="${k}"]`);
             if (el) el.value = c[k] ?? '';
         }
@@ -160,3 +168,5 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 @endpush
+
+@include('admin-v2.billing.partials.markup-fields-script', ['selectName' => 'default_markup_type'])

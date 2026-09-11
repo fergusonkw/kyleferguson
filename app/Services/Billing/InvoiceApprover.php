@@ -1,0 +1,178 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services\Billing;
+
+use App\Enums\Billing\InvoiceDocumentReason;
+use App\Enums\Billing\InvoiceStatus;
+use App\Exceptions\Billing\InvalidInvoiceTransition;
+use App\Models\Billing\Invoice;
+use App\Services\AuditLogger;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * Owns every invoice status change.
+ *
+ * No invoice leaves draft without an explicit approval, and nothing returns to
+ * draft once it has. Every transition is written to the audit log, because a
+ * status is a claim about what a client was told and when.
+ */
+final class InvoiceApprover
+{
+    public function __construct(
+        private readonly AuditLogger $audit,
+        private readonly InvoiceSnapshotter $snapshots,
+        private readonly SmallSupplierThreshold $threshold,
+        private readonly InvoicePdfRenderer $documents,
+    ) {}
+
+    /**
+     * Draft to approved. This is the moment the operator takes responsibility
+     * for the numbers, so the invoice must actually have some.
+     */
+    public function approve(Invoice $invoice): Invoice
+    {
+        $this->assertCanTransitionTo($invoice, InvoiceStatus::Approved);
+
+        if ($invoice->lines()->where('is_display_only', false)->doesntExist()) {
+            throw InvalidInvoiceTransition::because($invoice, 'has no billable lines to approve');
+        }
+
+        if (bccomp($invoice->total, '0.00', 2) === -1) {
+            throw InvalidInvoiceTransition::because($invoice, 'has a negative total and cannot be approved');
+        }
+
+        $approved = $this->apply($invoice, InvoiceStatus::Approved, function (Invoice $invoice): void {
+            $issuedOn = now();
+
+            // Approval is the moment the invoice becomes a permanent record, so
+            // it freezes the business and client as they are *now* — not as
+            // they were when the draft was first generated. Configuring a
+            // business between the two would otherwise issue an invoice
+            // carrying details the operator had already corrected.
+            $this->snapshots->capture($invoice);
+
+            // A due date set by hand on the draft is a deliberate choice —
+            // "due on receipt", a date negotiated for this one invoice — so
+            // approval honours it instead of overwriting it with the default.
+            $dueOn = $invoice->due_on
+                ?? $issuedOn->copy()->addDays($invoice->business->payment_terms_days);
+
+            $invoice->forceFill([
+                'status' => InvoiceStatus::Approved,
+                'approved_at' => $issuedOn,
+                'issued_on' => $issuedOn->toDateString(),
+                'due_on' => $dueOn->toDateString(),
+            ])->save();
+
+            // The record of what the client is being sent, captured in the same
+            // transaction as the approval so one never exists without the other.
+            $this->documents->freeze($invoice, InvoiceDocumentReason::Approved);
+        });
+
+        // Outside the transaction: it may need an exchange rate fetched, and a
+        // rate that is not available yet is filled in later rather than
+        // holding up the approval.
+        $this->threshold->recordSupplyValue($approved);
+
+        return $approved;
+    }
+
+    /**
+     * Approved to sent. Called once the client mail has actually gone out, so
+     * `sent_at` means "the client has it", not "we intended to send it".
+     */
+    public function markSent(Invoice $invoice): Invoice
+    {
+        $this->assertCanTransitionTo($invoice, InvoiceStatus::Sent);
+
+        return $this->apply($invoice, InvoiceStatus::Sent, function (Invoice $invoice): void {
+            $invoice->forceFill([
+                'status' => InvoiceStatus::Sent,
+                'sent_at' => now(),
+            ])->save();
+        });
+    }
+
+    /**
+     * Void an invoice at any live status. Voided invoices are never deleted or
+     * re-issued — the number stays consumed so the sequence has no silent gaps.
+     */
+    public function void(Invoice $invoice, ?string $reason = null): Invoice
+    {
+        $this->assertCanTransitionTo($invoice, InvoiceStatus::Void);
+
+        return $this->apply($invoice, InvoiceStatus::Void, function (Invoice $invoice) use ($reason): void {
+            $invoice->forceFill([
+                'status' => InvoiceStatus::Void,
+                'voided_at' => now(),
+                'notes' => $reason !== null
+                    ? trim($invoice->notes."\nVoided: ".$reason)
+                    : $invoice->notes,
+            ])->save();
+        }, ['reason' => $reason]);
+    }
+
+    /**
+     * Move to a payment-derived status. Only {@see PaymentRecorder} should call
+     * this — an operator cannot mark an invoice paid without a payment record.
+     *
+     * Movement is free within the payment-tracked set, since voiding payments
+     * has to be able to walk a status back, but a payment can never drag an
+     * invoice into or out of that set: it cannot revive a void invoice or
+     * approve a draft.
+     */
+    public function applyPaymentStatus(Invoice $invoice, InvoiceStatus $status): Invoice
+    {
+        if ($invoice->status === $status) {
+            return $invoice;
+        }
+
+        if (! $invoice->status->isPaymentTracked() || ! $status->isPaymentTracked()) {
+            throw InvalidInvoiceTransition::between($invoice, $status);
+        }
+
+        return $this->apply($invoice, $status, function (Invoice $invoice) use ($status): void {
+            $invoice->forceFill(['status' => $status])->save();
+        });
+    }
+
+    public function assertCanTransitionTo(Invoice $invoice, InvoiceStatus $to): void
+    {
+        if (! $invoice->status->canTransitionTo($to)) {
+            throw InvalidInvoiceTransition::between($invoice, $to);
+        }
+    }
+
+    /**
+     * @param  callable(Invoice): void  $mutate
+     * @param  array<string, mixed>  $context
+     */
+    private function apply(Invoice $invoice, InvoiceStatus $to, callable $mutate, array $context = []): Invoice
+    {
+        $from = $invoice->status;
+
+        return DB::transaction(function () use ($invoice, $from, $to, $mutate, $context): Invoice {
+            $mutate($invoice);
+
+            $this->audit->logCritical(
+                'invoice_status_changed',
+                $invoice,
+                null,
+                array_merge([
+                    'invoice_id' => $invoice->id,
+                    'invoice_number' => $invoice->invoice_number,
+                    'business_id' => $invoice->business_id,
+                    'client_id' => $invoice->client_id,
+                    'from' => $from->value,
+                    'to' => $to->value,
+                    'total' => $invoice->total,
+                ], $context),
+                ['billing', 'invoice', 'status'],
+            );
+
+            return $invoice;
+        });
+    }
+}

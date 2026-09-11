@@ -42,6 +42,25 @@ abstract class TestCase extends BaseTestCase
         return $this->createUserWithRole(RoleEnum::SuperAdmin->slug());
     }
 
+    /**
+     * Decode a JSON fixture from `tests/Fixtures/`.
+     *
+     * @return array<string, mixed>
+     */
+    protected function jsonFixture(string $relativePath): array
+    {
+        $path = __DIR__.'/Fixtures/'.$relativePath;
+
+        if (! is_file($path)) {
+            $this->fail("Fixture not found: {$relativePath}");
+        }
+
+        /** @var array<string, mixed> $decoded */
+        $decoded = json_decode((string) file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
+
+        return $decoded;
+    }
+
     protected function createAdmin(): User
     {
         return $this->createUserWithRole(RoleEnum::Admin->slug());

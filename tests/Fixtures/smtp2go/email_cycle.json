@@ -1,0 +1,10 @@
+{
+  "request_id": "4b84c952-9bca-432f-a68e-585e4c7a969c",
+  "data": {
+    "cycle_start": "2026-08-01 00:00:00+00:00",
+    "cycle_end": "2026-08-31 00:00:00+00:00",
+    "cycle_used": 8412,
+    "cycle_remaining": 1588,
+    "cycle_max": 10000
+  }
+}

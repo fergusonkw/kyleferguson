@@ -6,10 +6,11 @@ namespace Tests\Feature\Billing;
 
 use App\Enums\Billing\SyncStatus;
 use App\Enums\Role as RoleEnum;
-use App\Jobs\Billing\SyncDigitalOceanProjectsJob;
+use App\Jobs\Billing\SyncProviderResourcesJob;
 use App\Models\Billing\Business;
 use App\Models\Billing\Client;
 use App\Models\Billing\CostProvider;
+use App\Models\Billing\LegalEntity;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
@@ -190,8 +191,8 @@ final class CheckpointC2CrudTest extends TestCase
             ->assertOk();
 
         Bus::assertDispatched(
-            SyncDigitalOceanProjectsJob::class,
-            fn (SyncDigitalOceanProjectsJob $job) => $job->costProviderId === $provider->id,
+            SyncProviderResourcesJob::class,
+            fn (SyncProviderResourcesJob $job) => $job->costProviderId === $provider->id,
         );
     }
 
@@ -205,7 +206,7 @@ final class CheckpointC2CrudTest extends TestCase
             ->postJson(route('admin.billing.cost-providers.sync', $provider))
             ->assertStatus(422);
 
-        Bus::assertNotDispatched(SyncDigitalOceanProjectsJob::class);
+        Bus::assertNotDispatched(SyncProviderResourcesJob::class);
     }
 
     public function test_cost_provider_data_endpoint_scopes_to_current_business(): void
@@ -253,6 +254,7 @@ final class CheckpointC2CrudTest extends TestCase
     private function adminPayload(array $overrides = []): array
     {
         return array_merge([
+            'legal_entity_id' => LegalEntity::query()->value('id') ?? LegalEntity::factory()->create()->id,
             'name' => 'Acme Hosting',
             'contact_email' => 'hello@acme.test',
             'notification_email' => 'invoices@acme.test',

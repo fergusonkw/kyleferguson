@@ -8,6 +8,7 @@ use App\Models\AuditLog;
 use App\Models\Billing\Business;
 use App\Models\Billing\Client;
 use App\Models\Billing\CostProvider;
+use App\Models\Billing\LegalEntity;
 use App\Models\Billing\Project;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -21,6 +22,7 @@ final class CheckpointC4AuditLogTest extends TestCase
     {
         $this->actingAs($this->createAdmin())
             ->postJson(route('admin.billing.businesses.store'), [
+                'legal_entity_id' => LegalEntity::factory()->create()->id,
                 'name' => 'Acme',
                 'contact_email' => 'a@b.c',
                 'notification_email' => 'n@b.c',

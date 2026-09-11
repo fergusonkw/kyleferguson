@@ -106,138 +106,8 @@ import "datatables.net-select";
 import "datatables.net-buttons";
 window.DataTable = DataTable;
 
-import {
-    createIcons,
-    // brand / decoration
-    CircleDot,
-    Package,
-    ShieldCheck,
-    Trophy,
-    Check,
-    // sidenav — main
-    LayoutDashboard,
-    CalendarDays,
-    FileUp,
-    Users,
-    // sidenav — master data
-    Building2,
-    Sigma,
-    Truck,
-    Files,
-    Image,
-    Gavel,
-    Megaphone,
-    ClipboardList,
-    // sidenav — system
-    UserCog,
-    KeyRound,
-    FileBarChart2,
-    Database,
-    Timer,
-    BarChart2,
-    Wrench,
-    // topbar / layout
-    Menu,
-    ChevronDown,
-    Mails,
-    Bell,
-    Moon,
-    Sun,
-    CircleUser,
-    LogOut,
-    Settings,
-    Settings2,
-    X,
-    // components — alerts, page-title, help, card
-    AlertCircle,
-    AlertTriangle,
-    CircleCheck,
-    Home,
-    HelpCircle,
-    Info,
-    Lightbulb,
-    ChevronUp,
-    // dashboard stat-card icons
-    CalendarClock,
-    ClipboardCheck,
-    Car,
-    CalendarCheck,
-    ShieldUser,
-    // page action icons (CRUD, nav, status)
-    Plus,
-    Eye,
-    Pencil,
-    Trash2,
-    GitMerge,
-    UserMinus,
-    UserPlus,
-    ArrowRight,
-    ArrowLeft,
-    ChevronRight,
-    RefreshCw,
-    Star,
-    Globe,
-    Wand2,
-    Search,
-    Printer,
-    MessageCircle,
-    MapPin,
-    MailX,
-    LockOpen,
-    Lock,
-    ListOrdered,
-    GripVertical,
-    Flag,
-    Download,
-    Save,
-    Copy,
-    Clock,
-    Camera,
-    Calculator,
-    BellOff,
-    Archive,
-    Ban,
-    ShoppingCart,
-    TableProperties,
-    FileText,
-    PhoneCall,
-    Mail,
-    ExternalLink,
-    Link,
-    RotateCcw,
-    // additional — used across pages but previously unregistered
-    BarChart,
-    Calendar,
-    CheckCircle,
-    CheckSquare,
-    ChartLine,
-    CircleX,
-    CloudUpload,
-    File,
-    FileCode,
-    FileSearch,
-    Filter,
-    FunctionSquare,
-    Key,
-    List,
-    Loader2,
-    Monitor,
-    Play,
-    PlusCircle,
-    RotateCw,
-    Ruler,
-    CalendarPlus,
-    Ellipsis,
-    TriangleAlert,
-    Undo,
-    Upload,
-    Wand,
-    XCircle,
-    BriefcaseBusiness,
-    Receipt,
-    Cloud,
-    FolderKanban,
-} from "lucide";
+import { createIcons } from "lucide";
+import { adminIcons } from "./icons.js";
 
 // Module scripts execute after document parse but, depending on cache /
 // load order, can fire BEFORE OR AFTER `DOMContentLoaded`. A bare
@@ -260,32 +130,8 @@ window.HSOverlay = HSOverlay;
 
 ready(() => {
     HSStaticMethods.autoInit();
-    // Tree-shakable: only the icons referenced by name actually ship in the
-    // bundle. Pages that need more icons either (a) extend this list, or
-    // (b) import + register additional icons from their own page-specific
-    // entry. F.4 sub-sessions will refactor this once we know each page's
-    // icon footprint.
-    createIcons({
-        icons: {
-            CircleDot, Package, ShieldCheck, Trophy, Check,
-            LayoutDashboard, CalendarDays, FileUp, Users,
-            Building2, Sigma, Truck, Files, Image, Gavel, Megaphone, ClipboardList,
-            UserCog, KeyRound, FileBarChart2, Database, Timer, BarChart2, Wrench,
-            Menu, ChevronDown, Mails, Bell, Moon, Sun, CircleUser, LogOut,
-            Settings, Settings2, X,
-            AlertCircle, AlertTriangle, CircleCheck, Home, HelpCircle, Info, Lightbulb, ChevronUp,
-            CalendarClock, ClipboardCheck, Car, CalendarCheck, ShieldUser,
-            Plus, Eye, Pencil, Trash2, GitMerge, UserMinus, UserPlus,
-            ArrowRight, ArrowLeft, ChevronRight, RefreshCw, Star, Globe,
-            Wand2, Search, Printer, MessageCircle, MapPin, MailX, LockOpen,
-            Lock, ListOrdered, GripVertical, Flag, Download, Save, Copy,
-            Clock, Camera, Calculator, BellOff, Archive, Ban, ShoppingCart,
-            TableProperties, FileText, PhoneCall, Mail, ExternalLink, Link, RotateCcw,
-            BarChart, Calendar, CheckCircle, CheckSquare, ChartLine, CircleX,
-            CloudUpload, File, FileCode, FileSearch, Filter, FunctionSquare,
-            Key, List, Loader2, Monitor, Play, PlusCircle, RotateCw, Ruler,
-            CalendarPlus, Ellipsis, TriangleAlert, Undo, Upload, Wand, XCircle,
-            BriefcaseBusiness, Receipt, Cloud, FolderKanban,
-        },
-    });
+    // The icon registry is shared with app.js so first paint and the
+    // MutationObserver's re-renders always resolve the same set. See
+    // ./icons.js for how to add one.
+    createIcons({ icons: adminIcons });
 });
