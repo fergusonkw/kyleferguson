@@ -6,6 +6,7 @@ namespace App\Http\Requests;
 
 use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
@@ -54,5 +55,16 @@ final class UpdateUserRequest extends FormRequest
             'password.confirmed' => 'The password confirmation does not match.',
             'roles.*.exists' => 'The selected role does not exist.',
         ];
+    }
+
+    /**
+     * Lowercase before `unique` runs, so it checks the address as it will be
+     * stored rather than as it was typed.
+     */
+    protected function prepareForValidation(): void
+    {
+        if (is_string($this->input('email'))) {
+            $this->merge(['email' => Str::lower(trim($this->input('email')))]);
+        }
     }
 }

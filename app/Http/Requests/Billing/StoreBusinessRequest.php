@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Http\Requests\Billing;
 
 use App\Models\Billing\Business;
+use App\Services\Billing\InvoiceTemplateRegistry;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 final class StoreBusinessRequest extends FormRequest
 {
@@ -32,9 +34,28 @@ final class StoreBusinessRequest extends FormRequest
             'supported_currencies' => ['required', 'array', 'min:1'],
             'supported_currencies.*' => ['string', 'size:3'],
             'fx_source' => ['required', 'string', 'max:64'],
-            'tax_registered_from' => ['nullable', 'date'],
+            'legal_entity_id' => ['required', 'integer', 'exists:legal_entities,id'],
             'daily_reminder_time' => ['required', 'date_format:H:i'],
             'late_fee_terms' => ['nullable', 'string', 'max:2000'],
+            'payment_terms_days' => ['sometimes', 'integer', 'min:0', 'max:365'],
+            'cheque_payable_to' => ['nullable', 'string', 'max:255'],
+
+            // The logo is inlined into every rendered invoice as a data URI,
+            // so the cap is about document size as much as upload size.
+            //
+            // SVG is allowed against Laravel's default because a vector prints
+            // sharp at any size, and the XSS the default guards against needs
+            // the file to be served as a document. This one is only ever
+            // emitted as `<img src="data:image/svg+xml;...">`, where scripts
+            // do not run.
+            'logo' => ['nullable', 'image:allow_svg', 'mimes:png,jpg,jpeg,webp,svg', 'max:512'],
+            'remove_logo' => ['nullable', 'boolean'],
+
+            // Both columns are non-nullable with a default, so these are
+            // `sometimes` rather than `nullable`: omitting them keeps the
+            // default, but sending a blank one would store an empty view name.
+            'invoice_template_view' => ['sometimes', 'required', 'string', Rule::in(array_keys(app(InvoiceTemplateRegistry::class)->invoiceTemplates()))],
+            'email_template_view' => ['sometimes', 'required', 'string', Rule::in(array_keys(app(InvoiceTemplateRegistry::class)->emailTemplates()))],
         ];
     }
 
@@ -46,6 +67,8 @@ final class StoreBusinessRequest extends FormRequest
         return [
             'name.required' => 'A business name is required.',
             'name.unique' => 'A business with this name already exists.',
+            'legal_entity_id.required' => 'Choose the legal entity this business trades under.',
+            'legal_entity_id.exists' => 'The selected legal entity does not exist.',
             'contact_email.required' => 'A contact email is required.',
             'notification_email.required' => 'A notification email is required (where draft-invoice alerts are sent).',
             'default_currency.size' => 'Currency must be a 3-letter code (e.g. CAD).',

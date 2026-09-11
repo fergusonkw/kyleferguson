@@ -1,0 +1,517 @@
+/* Vendored from fergusonkw/tracker-pull-marketing-site
+   templates/kit/tracker-pull-doc.css @ 273b125
+   Synced 2026-09-09 by `php artisan billing:sync-document-kit`.
+   Do not edit here — change it upstream and re-run that command. */
+
+/*
+  ============================================================
+   TRACKER PULL — DOCUMENT KIT
+  ============================================================
+   Canonical styles for printable documents: invoices, reports,
+   letters, memos, statements of work.
+
+   This file is the SINGLE SOURCE OF TRUTH. Do not hand-edit the
+   <style> blocks inside templates/*.html — they are generated.
+   After changing this file run:
+
+       npm run templates:build
+
+   ...which re-inlines this CSS (and kit/logo.svg) into every
+   standalone template between the kit:css / kit:logo markers.
+
+   Consumers:
+     - templates/invoice.html
+     - templates/document.html
+     - templates/report.html
+     - the TrackerPull Laravel app (auto-generated reports)
+       see templates/README.md for the sync story.
+
+   Sections:
+     1.  Tokens
+     2.  Base + page
+     3.  Header
+     4.  Meta row
+     5.  Parties (From / To)
+     6.  Prose (headings, paragraphs, lists)
+     7.  Sections
+     8.  Stat cards
+     9.  Tables — items (invoice) + data (report)
+     10. Totals
+     11. Callouts / notes
+     12. Badges
+     13. Signatures
+     14. Footer
+     15. Utilities + print
+  ============================================================
+*/
+
+/* ---------- 1. Tokens ---------- */
+:root {
+  --brand-red: #DC2626;
+  --brand-red-dark: #B91C1C;
+  --text: #111827;
+  --text-muted: #6B7280;
+  --text-faint: #9CA3AF;
+  --border: #E5E7EB;
+  --bg-soft: #F9FAFB;
+  --bg: #FFFFFF;
+
+  /* Status accents — used by badges and stat deltas. */
+  --ok: #15803D;
+  --ok-soft: #ECFDF5;
+  --warn: #B45309;
+  --warn-soft: #FFFBEB;
+  --info: #1D4ED8;
+  --info-soft: #EFF6FF;
+}
+
+* { box-sizing: border-box; }
+
+/* ---------- 2. Base + page ---------- */
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #F3F4F6;
+  color: var(--text);
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page {
+  max-width: 8.5in;
+  margin: 24px auto;
+  background: var(--bg);
+  padding: 0.6in;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+/* Landscape variant — add class="page wide" and set @page size in the template. */
+.page.wide { max-width: 11in; }
+
+/* ---------- 3. Header ---------- */
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+.logo { width: 200px; height: auto; flex: 0 0 auto; }
+.header-text { text-align: right; }
+.title {
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--brand-red);
+  text-transform: uppercase;
+  line-height: 1;
+  margin: 6px 0 0;
+}
+/* Use .title.sm for longer titles ("Season Performance Report"). */
+.title.sm { font-size: 24px; letter-spacing: 0.06em; }
+.subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 8px 0 0;
+  line-height: 1.4;
+}
+
+/* ---------- 4. Meta row ---------- */
+.meta {
+  display: flex;
+  justify-content: flex-end;
+  gap: 32px;
+  padding: 20px 0 28px;
+}
+.meta-cell { text-align: right; }
+.meta-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 2px;
+}
+.meta-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* ---------- 5. Parties (From / To) ---------- */
+.parties {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  padding-bottom: 32px;
+}
+.party-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+.party-name {
+  font-weight: 600;
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+.party-lines {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.party-lines div { margin-bottom: 2px; }
+
+/* ---------- 6. Prose ---------- */
+.prose { font-size: 14px; }
+.prose h2 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 28px 0 8px;
+}
+.prose h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 20px 0 6px;
+}
+.prose h2:first-child,
+.prose h3:first-child { margin-top: 0; }
+.prose p { margin: 0 0 12px; }
+.prose ul,
+.prose ol { margin: 0 0 12px; padding-left: 22px; }
+.prose li { margin-bottom: 5px; }
+.prose li::marker { color: var(--text-muted); }
+.prose a { color: var(--brand-red); text-decoration: none; }
+.prose strong { font-weight: 600; }
+.prose code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.prose hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 24px 0;
+}
+.prose blockquote {
+  margin: 0 0 12px;
+  padding: 2px 0 2px 16px;
+  border-left: 3px solid var(--border);
+  color: var(--text-muted);
+}
+.lead {
+  font-size: 15px;
+  color: var(--text-muted);
+  margin: 0 0 20px;
+}
+
+/* ---------- 7. Sections ---------- */
+.section { margin-bottom: 32px; }
+.section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 14px;
+}
+.section-title .count {
+  float: right;
+  font-weight: 500;
+  color: var(--text-faint);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ---------- 8. Stat cards ---------- */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 32px;
+}
+.stats.cols-2 { grid-template-columns: repeat(2, 1fr); }
+.stats.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.stat {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+.stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.stat-value.accent { color: var(--brand-red); }
+.stat-sub {
+  font-size: 12px;
+  color: var(--text-faint);
+  margin-top: 4px;
+}
+.stat-sub.up { color: var(--ok); }
+.stat-sub.down { color: var(--brand-red); }
+
+/* ---------- 9. Tables ---------- */
+
+/* 9a. Line items — invoices, quotes. Airy, no vertical rules. */
+table.items {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+}
+table.items thead th {
+  background: var(--bg-soft);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-align: left;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+table.items th.num,
+table.items td.num { text-align: right; white-space: nowrap; }
+table.items tbody td {
+  padding: 14px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+table.items tbody tr:last-child td { border-bottom: 1px solid var(--border); }
+.item-desc { font-weight: 500; color: var(--text); }
+.item-sub  { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
+
+/* 9b. Data tables — reports. Denser, built for many rows. */
+table.data {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+table.data thead th {
+  background: var(--bg-soft);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-align: left;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+table.data tbody td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+table.data th.num,
+table.data td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+table.data th.center,
+table.data td.center { text-align: center; }
+table.data .primary { font-weight: 500; color: var(--text); }
+table.data .muted { color: var(--text-muted); }
+/* Zebra striping — opt in with class="data striped". */
+table.data.striped tbody tr:nth-child(even) td { background: var(--bg-soft); }
+/* Group header row inside a data table. */
+table.data tr.group td {
+  background: var(--bg-soft);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 7px 10px;
+}
+/* Subtotal / total row inside a data table. */
+table.data tr.subtotal td {
+  font-weight: 600;
+  border-top: 1px solid var(--border);
+  border-bottom: 2px solid var(--border);
+}
+table.data tr.subtotal td.num { color: var(--brand-red); }
+/* Empty state. */
+table.data td.empty {
+  text-align: center;
+  color: var(--text-faint);
+  padding: 24px 10px;
+  font-style: italic;
+}
+
+/* ---------- 10. Totals ---------- */
+.totals {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 32px;
+}
+.totals-table { min-width: 280px; }
+.totals-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 14px;
+}
+.totals-row .label { color: var(--text-muted); }
+.totals-row .value { font-variant-numeric: tabular-nums; }
+.totals-row.total {
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+  padding-top: 12px;
+  font-weight: 700;
+  font-size: 16px;
+}
+.totals-row.total .label { color: var(--text); }
+.totals-row.total .value { color: var(--brand-red); }
+
+/* ---------- 11. Callouts / notes ---------- */
+.notes {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 18px;
+  margin-bottom: 28px;
+}
+.notes-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+.notes-body {
+  font-size: 13px;
+  color: var(--text);
+}
+.notes-body p { margin: 0 0 8px; }
+.notes-body p:last-child { margin-bottom: 0; }
+.notes-body ul { margin: 0; padding-left: 20px; }
+/* Variants. */
+.notes.info { background: var(--info-soft); border-color: #BFDBFE; }
+.notes.info .notes-label { color: var(--info); }
+.notes.warn { background: var(--warn-soft); border-color: #FDE68A; }
+.notes.warn .notes-label { color: var(--warn); }
+.notes.accent { border-left: 3px solid var(--brand-red); }
+
+/* ---------- 12. Badges ---------- */
+.badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.badge.ok   { background: var(--ok-soft);   border-color: #A7F3D0; color: var(--ok); }
+.badge.warn { background: var(--warn-soft); border-color: #FDE68A; color: var(--warn); }
+.badge.info { background: var(--info-soft); border-color: #BFDBFE; color: var(--info); }
+.badge.alert{ background: #FEF2F2;          border-color: #FECACA; color: var(--brand-red); }
+
+/* ---------- 13. Signatures ---------- */
+.signatures {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  margin: 40px 0 32px;
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+.signature { padding-top: 34px; }
+.signature .line {
+  border-bottom: 1px solid var(--text);
+  margin-bottom: 6px;
+}
+.signature .name {
+  font-weight: 600;
+  font-size: 13px;
+}
+.signature .role {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.signature .date-line {
+  margin-top: 22px;
+  border-bottom: 1px solid var(--border);
+}
+.signature .date-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 4px;
+}
+
+/* ---------- 14. Footer ---------- */
+.footer {
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.footer a { color: var(--brand-red); text-decoration: none; }
+
+/* ---------- 15. Utilities + print ---------- */
+.mono { font-variant-numeric: tabular-nums; }
+.nowrap { white-space: nowrap; }
+.text-right { text-align: right; }
+.text-muted { color: var(--text-muted); }
+.mb-0 { margin-bottom: 0; }
+.page-break { page-break-before: always; break-before: page; }
+.avoid-break { page-break-inside: avoid; break-inside: avoid; }
+/* On-screen controls (Print / Close buttons, filters) — hidden on paper. */
+.screen-only { }
+
+@page {
+  size: Letter;
+  margin: 0.5in;
+}
+
+@media print {
+  html, body { background: #fff; }
+  .page {
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    max-width: none;
+  }
+  .screen-only { display: none !important; }
+  /* Repeat table headers across page breaks. */
+  thead { display: table-header-group; }
+  tfoot { display: table-footer-group; }
+  tr, .stat, .notes { page-break-inside: avoid; break-inside: avoid; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

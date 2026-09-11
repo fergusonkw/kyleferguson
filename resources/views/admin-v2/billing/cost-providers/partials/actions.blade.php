@@ -1,8 +1,18 @@
+@php
+    $registry = app(\App\Services\Billing\ProviderAdapterRegistry::class);
+@endphp
 <div class="flex gap-1 justify-center">
     @can('sync', $provider)
-        <button type="button" class="btn btn-sm btn-light sync-provider" data-id="{{ $provider->id }}" aria-label="Sync now" title="Sync now">
-            <i data-lucide="refresh-cw" class="size-4"></i>
-        </button>
+        @if($registry->supportsResourceSync($provider->slug))
+            <button type="button" class="btn btn-sm btn-light sync-provider" data-id="{{ $provider->id }}" aria-label="Sync resources" title="Sync resources">
+                <i data-lucide="refresh-cw" class="size-4"></i>
+            </button>
+        @endif
+        @if($registry->supportsBillingSync($provider->slug))
+            <button type="button" class="btn btn-sm btn-light sync-provider-billing" data-id="{{ $provider->id }}" aria-label="Sync billing" title="Sync billing for this month">
+                <i data-lucide="receipt" class="size-4"></i>
+            </button>
+        @endif
     @endcan
     @can('update', $provider)
         <button type="button" class="btn btn-sm btn-light edit-provider" data-id="{{ $provider->id }}" aria-label="Edit" title="Edit">
