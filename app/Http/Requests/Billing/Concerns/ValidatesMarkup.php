@@ -42,6 +42,19 @@ trait ValidatesMarkup
         }
     }
 
+    /**
+     * A client's markup columns are NOT NULL, but the form submits the unused
+     * component empty, which arrives as null. Only submitted fields are
+     * touched so an omitted one keeps its column default or current value.
+     */
+    protected function zeroEmptyMarkupComponents(string ...$fields): void
+    {
+        $this->merge(array_map(
+            fn (mixed $value): mixed => $value ?? 0,
+            $this->only($fields),
+        ));
+    }
+
     private function hasPositive(string $field): bool
     {
         $value = $this->input($field);

@@ -55,4 +55,9 @@ final class UpdateClientRequest extends FormRequest
             $v, $this->input('default_markup_type'), 'default_markup_value', 'default_markup_fee',
         ));
     }
+
+    protected function prepareForValidation(): void
+    {
+        $this->zeroEmptyMarkupComponents('default_markup_value', 'default_markup_fee');
+    }
 }

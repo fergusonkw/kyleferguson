@@ -123,6 +123,74 @@ final class CheckpointE6MarkupConfigTest extends TestCase
             ->assertOk();
     }
 
+    /**
+     * The admin form always submits both markup fields, and an empty one
+     * arrives as null — the unused component must be stored as zero rather
+     * than violating the NOT NULL column.
+     */
+    public function test_a_percent_default_with_an_empty_fee_field_is_stored_as_zero_fee(): void
+    {
+        $this->actingAs($this->createAdmin())
+            ->postJson(route('admin.billing.clients.store'), $this->clientPayload([
+                'default_markup_type' => MarkupType::Percent->value,
+                'default_markup_value' => '10',
+                'default_markup_fee' => null,
+            ]))
+            ->assertOk();
+
+        $client = Client::query()->firstOrFail();
+        $this->assertSame('10.0000', $client->default_markup_value);
+        $this->assertSame('0.0000', $client->default_markup_fee);
+    }
+
+    public function test_a_fixed_fee_default_with_an_empty_percent_field_is_stored_as_zero_percent(): void
+    {
+        $this->actingAs($this->createAdmin())
+            ->postJson(route('admin.billing.clients.store'), $this->clientPayload([
+                'default_markup_type' => MarkupType::FixedFee->value,
+                'default_markup_value' => null,
+                'default_markup_fee' => '40.00',
+            ]))
+            ->assertOk();
+
+        $client = Client::query()->firstOrFail();
+        $this->assertSame('0.0000', $client->default_markup_value);
+        $this->assertSame('40.0000', $client->default_markup_fee);
+    }
+
+    public function test_updating_a_client_with_empty_markup_fields_stores_zeros(): void
+    {
+        $client = Client::factory()->for($this->business)->create([
+            'default_markup_type' => MarkupType::Hybrid,
+            'default_markup_value' => 15,
+            'default_markup_fee' => 40,
+        ]);
+
+        $this->actingAs($this->createAdmin())
+            ->putJson(route('admin.billing.clients.update', $client), $this->clientPayload([
+                'default_markup_type' => MarkupType::Passthrough->value,
+                'default_markup_value' => null,
+                'default_markup_fee' => null,
+            ]))
+            ->assertOk();
+
+        $client->refresh();
+        $this->assertSame('0.0000', $client->default_markup_value);
+        $this->assertSame('0.0000', $client->default_markup_fee);
+    }
+
+    public function test_a_fixed_fee_default_with_an_empty_fee_field_is_still_rejected(): void
+    {
+        $this->actingAs($this->createAdmin())
+            ->postJson(route('admin.billing.clients.store'), $this->clientPayload([
+                'default_markup_type' => MarkupType::FixedFee->value,
+                'default_markup_value' => null,
+                'default_markup_fee' => null,
+            ]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['default_markup_fee']);
+    }
+
     public function test_a_project_can_override_with_a_hybrid_markup(): void
     {
         $client = Client::factory()->for($this->business)->create();
