@@ -15,9 +15,9 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * link. No login: asking a client to create an account to read an invoice is a
  * good way not to get paid.
  *
- * Only issued invoices resolve. A draft or a voided invoice returns 404 rather
- * than a "not available" page, so a leaked link cannot even confirm that an
- * invoice exists for that token.
+ * Only approved and issued invoices resolve. A draft or a voided invoice
+ * returns 404 rather than a "not available" page, so a leaked link cannot even
+ * confirm that an invoice exists for that token.
  */
 final class HostedInvoiceController extends Controller
 {
@@ -64,7 +64,7 @@ final class HostedInvoiceController extends Controller
             ->with(['topLevelLines.children', 'payments', 'business', 'client'])
             ->firstOrFail();
 
-        abort_unless($invoice->status->isIssued(), 404);
+        abort_unless($invoice->status->hasLiveClientLink(), 404);
 
         return $invoice;
     }

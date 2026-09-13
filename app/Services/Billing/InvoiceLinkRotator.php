@@ -17,8 +17,9 @@ use RuntimeException;
  * returning 404 the moment this commits, and nothing else about the invoice
  * changes: not its number, its PDF, or what it says.
  *
- * Only an issued invoice has a live link to rotate. A draft or an approved
- * invoice has never been in front of anyone, and a voided one already 404s.
+ * Only a live link can be rotated. A draft's link opens nothing yet, and a
+ * voided one already 404s. An approved invoice's link is live — it opens from
+ * the email preview — so it can be replaced before the email ever goes out.
  */
 final class InvoiceLinkRotator
 {
@@ -26,9 +27,9 @@ final class InvoiceLinkRotator
 
     public function rotate(Invoice $invoice): Invoice
     {
-        if (! $invoice->status->isIssued()) {
+        if (! $invoice->status->hasLiveClientLink()) {
             throw new RuntimeException(sprintf(
-                'Invoice %s has no live client link to replace — only a sent invoice has one.',
+                'Invoice %s has no live client link to replace — only an approved or sent invoice has one.',
                 $invoice->invoice_number,
             ));
         }

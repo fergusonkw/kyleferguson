@@ -86,11 +86,11 @@ final class CheckpointF7ClientLinkTest extends TestCase
         $this->get(route('invoices.hosted.show', $new))->assertOk();
     }
 
-    public function test_every_issued_status_can_have_its_link_replaced(): void
+    public function test_every_status_with_a_live_link_can_have_it_replaced(): void
     {
         $admin = $this->createAdmin();
 
-        foreach ([InvoiceStatus::Sent, InvoiceStatus::PartiallyPaid, InvoiceStatus::Paid] as $status) {
+        foreach ([InvoiceStatus::Approved, InvoiceStatus::Sent, InvoiceStatus::PartiallyPaid, InvoiceStatus::Paid] as $status) {
             $invoice = $this->invoice($status);
 
             $this->actingAs($admin)
@@ -101,24 +101,43 @@ final class CheckpointF7ClientLinkTest extends TestCase
         }
     }
 
-    public function test_an_invoice_that_was_never_issued_has_no_link_to_replace(): void
+    public function test_an_invoice_without_a_live_link_has_none_to_replace(): void
     {
-        // A draft or an approved invoice has not been in front of anyone, and a
-        // voided one already 404s, so replacing any of their links is a
-        // mistake worth refusing rather than silently doing.
+        // A draft's link opens nothing yet, and a voided one already 404s, so
+        // replacing either is a mistake worth refusing rather than silently
+        // doing.
         $admin = $this->createAdmin();
 
-        foreach ([InvoiceStatus::Draft, InvoiceStatus::Approved, InvoiceStatus::Void] as $status) {
+        foreach ([InvoiceStatus::Draft, InvoiceStatus::Void] as $status) {
             $invoice = $this->invoice($status);
 
             $this->actingAs($admin)
                 ->postJson(route('admin.billing.invoices.rotate-link', $invoice))
                 ->assertStatus(422)
                 ->assertJsonPath('success', false)
-                ->assertJsonPath('message', "Invoice {$invoice->invoice_number} has no live client link to replace — only a sent invoice has one.");
+                ->assertJsonPath('message', "Invoice {$invoice->invoice_number} has no live client link to replace — only an approved or sent invoice has one.");
 
             $this->assertSame($invoice->hosted_view_token, $invoice->fresh()->hosted_view_token, $status->value);
         }
+    }
+
+    public function test_only_a_sent_invoice_is_told_to_resend_after_a_replacement(): void
+    {
+        // An approved invoice's first email will carry the new link, so
+        // there is nothing to resend yet.
+        $admin = $this->createAdmin();
+        $approved = $this->invoice(InvoiceStatus::Approved);
+        $sent = $this->invoice(InvoiceStatus::Sent);
+
+        $this->actingAs($admin)
+            ->postJson(route('admin.billing.invoices.rotate-link', $approved))
+            ->assertOk()
+            ->assertJsonPath('message', "{$approved->invoice_number} has a new client link. The old one no longer works.");
+
+        $this->actingAs($admin)
+            ->postJson(route('admin.billing.invoices.rotate-link', $sent))
+            ->assertOk()
+            ->assertJsonPath('message', "{$sent->invoice_number} has a new client link. The old one no longer works — resend the invoice to give the client the new one.");
     }
 
     public function test_replacing_the_link_needs_the_issuing_permission(): void
@@ -218,11 +237,22 @@ final class CheckpointF7ClientLinkTest extends TestCase
             ->assertDontSee('id="rotateLinkBtn"', false);
     }
 
-    public function test_an_invoice_that_was_never_issued_shows_no_link(): void
+    public function test_an_approved_invoice_shows_its_link_before_it_is_sent(): void
+    {
+        $invoice = $this->invoice(InvoiceStatus::Approved);
+
+        $this->actingAs($this->createAdmin())
+            ->get(route('admin.billing.invoices.show', $invoice))
+            ->assertOk()
+            ->assertSee('id="clientLinkInput"', false)
+            ->assertSee(route('invoices.hosted.show', $invoice->hosted_view_token), false);
+    }
+
+    public function test_an_invoice_without_a_live_link_shows_none(): void
     {
         $admin = $this->createAdmin();
 
-        foreach ([InvoiceStatus::Draft, InvoiceStatus::Approved, InvoiceStatus::Void] as $status) {
+        foreach ([InvoiceStatus::Draft, InvoiceStatus::Void] as $status) {
             $invoice = $this->invoice($status);
 
             $this->actingAs($admin)

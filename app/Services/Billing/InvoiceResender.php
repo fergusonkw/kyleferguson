@@ -47,7 +47,7 @@ final class InvoiceResender
     ): Invoice {
         if (! $invoice->status->isIssued()) {
             throw new RuntimeException(sprintf(
-                'Invoice %s has not been sent yet — use Mark Sent to send it the first time.',
+                'Invoice %s has not been sent yet — use Email Invoice to send it the first time.',
                 $invoice->invoice_number,
             ));
         }
@@ -82,7 +82,7 @@ final class InvoiceResender
 
         Mail::to($recipient)->send(new ClientInvoiceMail($invoice));
 
-        // Only once the mail is handed off, the same promise Mark Sent makes.
+        // Only once the mail is handed off, the same promise Email Invoice makes.
         $invoice->forceFill(['sent_at' => now()])->save();
 
         $this->audit->logCritical(

@@ -234,8 +234,7 @@ final class InvoiceController extends Controller
                 $invoice->update(['client_message' => $request->clientMessage()]);
             }
 
-            $recipient = $invoice->client_snapshot['contact_email']
-                ?? $invoice->client->contact_email;
+            $recipient = $invoice->firstSendRecipient();
 
             Mail::to($recipient)->send(new ClientInvoiceMail($invoice));
 
@@ -319,8 +318,14 @@ final class InvoiceController extends Controller
     {
         $this->authorize('rotateLink', $invoice);
 
-        return $this->attempt(fn (): string => $this->linkRotator->rotate($invoice)->invoice_number
-            .' has a new client link. The old one no longer works — resend the invoice to give the client the new one.');
+        return $this->attempt(function () use ($invoice): string {
+            $rotated = $this->linkRotator->rotate($invoice);
+
+            // An approved invoice has not gone out, so its first email will
+            // carry the new link — there is nothing to resend yet.
+            return $rotated->invoice_number.' has a new client link. The old one no longer works'
+                .($rotated->status->isIssued() ? ' — resend the invoice to give the client the new one.' : '.');
+        });
     }
 
     /**
