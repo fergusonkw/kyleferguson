@@ -7,10 +7,12 @@ namespace App\Mail\Transport;
 use App\Services\Mail\EmailDeliveryLog;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use LogicException;
 use Motomedialab\Smtp2Go\Exceptions\Smtp2GoException;
 use Motomedialab\Smtp2Go\Transports\Smtp2GoTransport;
 use Symfony\Component\Mailer\SentMessage;
 use Symfony\Component\Mime\Email;
+use Symfony\Component\Mime\Message;
 use Symfony\Component\Mime\MessageConverter;
 use Symfony\Component\Mime\Part\DataPart;
 use Throwable;
@@ -43,7 +45,15 @@ final class TrackingSmtp2GoTransport extends Smtp2GoTransport
 
     protected function doSend(SentMessage $message): void
     {
-        $email = MessageConverter::toEmail($message->getOriginalMessage());
+        $original = $message->getOriginalMessage();
+
+        // SMTP2Go's API takes the message in fields, which raw MIME cannot be
+        // taken apart into. Laravel only ever hands over a structured message.
+        if (! $original instanceof Message) {
+            throw new LogicException('SMTP2Go sends through its API, which needs a structured message, not raw MIME.');
+        }
+
+        $email = MessageConverter::toEmail($original);
 
         try {
             $emailId = $this->post($email);

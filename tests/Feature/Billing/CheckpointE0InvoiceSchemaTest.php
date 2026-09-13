@@ -167,6 +167,16 @@ final class CheckpointE0InvoiceSchemaTest extends TestCase
         $this->assertFalse(InvoiceStatus::Approved->isIssued());
     }
 
+    public function test_the_client_link_is_live_from_approval_until_voided(): void
+    {
+        foreach ([InvoiceStatus::Approved, InvoiceStatus::Sent, InvoiceStatus::PartiallyPaid, InvoiceStatus::Paid] as $status) {
+            $this->assertTrue($status->hasLiveClientLink(), $status->value.' must open at its link');
+        }
+
+        $this->assertFalse(InvoiceStatus::Draft->hasLiveClientLink());
+        $this->assertFalse(InvoiceStatus::Void->hasLiveClientLink());
+    }
+
     public function test_hosting_lines_are_not_operator_editable(): void
     {
         $this->assertFalse(InvoiceLineType::Hosting->isOperatorEditable());

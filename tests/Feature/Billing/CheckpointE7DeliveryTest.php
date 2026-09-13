@@ -29,6 +29,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Spatie\LaravelPdf\Facades\Pdf;
 use Tests\TestCase;
 
 /**
@@ -87,6 +88,27 @@ final class CheckpointE7DeliveryTest extends TestCase
 
         $this->assertGuest();
         $this->get(route('invoices.hosted.show', $invoice->hosted_view_token))->assertOk();
+    }
+
+    public function test_an_approved_invoice_is_readable_by_its_token_before_it_is_sent(): void
+    {
+        // So the link in the email preview can be followed before sending.
+        $invoice = $this->approved();
+
+        $this->get(route('invoices.hosted.show', $invoice->hosted_view_token))
+            ->assertOk()
+            ->assertSee($invoice->invoice_number)
+            ->assertSee('Download PDF');
+    }
+
+    public function test_an_approved_invoices_pdf_is_downloadable_by_token(): void
+    {
+        Pdf::fake();
+        $invoice = $this->approved();
+
+        $this->get(route('invoices.hosted.pdf', $invoice->hosted_view_token))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
     }
 
     public function test_a_draft_is_not_reachable_by_token(): void
@@ -193,6 +215,50 @@ final class CheckpointE7DeliveryTest extends TestCase
 
         Mail::assertSent(ClientInvoiceMail::class, fn (ClientInvoiceMail $m): bool => $m->hasTo('ap@acme.test'));
         $this->assertSame(InvoiceStatus::Sent, $invoice->fresh()->status);
+    }
+
+    public function test_the_send_button_says_it_emails_the_client(): void
+    {
+        // "Mark Sent" read as recording a send made some other way; the
+        // button is what actually emails the client.
+        $invoice = $this->approved();
+
+        $this->actingAs($this->createAdmin())
+            ->get(route('admin.billing.invoices.show', $invoice))
+            ->assertOk()
+            ->assertSee('Email Invoice')
+            ->assertDontSee('Mark Sent');
+    }
+
+    public function test_the_send_confirmation_names_the_address_the_email_goes_to(): void
+    {
+        // The address is the one captured with the invoice, so a client whose
+        // address changed since shows up in the confirmation, not afterwards.
+        Mail::fake();
+        Storage::fake('local');
+        $invoice = $this->approved();
+        $this->client->update(['contact_email' => 'new@acme.test']);
+        $admin = $this->createAdmin();
+
+        $this->actingAs($admin)
+            ->get(route('admin.billing.invoices.show', $invoice))
+            ->assertOk()
+            ->assertSee('data-recipient="ap@acme.test"', false);
+
+        $this->actingAs($admin)
+            ->postJson(route('admin.billing.invoices.sent', $invoice))
+            ->assertOk();
+
+        Mail::assertSent(ClientInvoiceMail::class, fn (ClientInvoiceMail $m): bool => $m->hasTo('ap@acme.test'));
+    }
+
+    public function test_an_invoice_captured_without_an_address_goes_to_the_clients_current_one(): void
+    {
+        $invoice = $this->approved();
+        $invoice->forceFill(['client_snapshot' => ['name' => 'Acme Industries']])->save();
+        $this->client->update(['contact_email' => 'new@acme.test']);
+
+        $this->assertSame('new@acme.test', $invoice->fresh()->firstSendRecipient());
     }
 
     public function test_the_status_does_not_move_when_the_mail_fails(): void

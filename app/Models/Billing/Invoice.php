@@ -189,6 +189,15 @@ final class Invoice extends Model
     }
 
     /**
+     * Where the first email goes: the address captured with the invoice, so
+     * the confirmation the operator reads and the send itself cannot disagree.
+     */
+    public function firstSendRecipient(): string
+    {
+        return $this->client_snapshot['contact_email'] ?? $this->client->contact_email;
+    }
+
+    /**
      * @param  Builder<Invoice>  $query
      * @return Builder<Invoice>
      */

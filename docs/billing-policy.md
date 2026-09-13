@@ -97,7 +97,8 @@ Rules:
 
 - All invoices are generated in `draft` status.
 - The user reviews each draft, optionally edits (manual lines, discounts, credits), and marks `approved`.
-- Approval triggers send: a **branded** email to the client containing the PDF as an attachment *and* a signed URL to a hosted view of the invoice.
+- Approval locks the invoice; sending is a separate step. **Email Invoice** sends a **branded** email to the client containing the PDF as an attachment *and* an unguessable link to a hosted view of the invoice.
+- The link works from approval on, so the operator can follow it in the email preview before sending. Drafts and voided invoices never open at their link.
 - Client-facing emails use a per-business Blade Mailable template, so each business presents its own header, logo, colors, and footer. PDF templates are also per-business.
 - The hosted view shows the same content as the PDF and is the future home for online payment status.
 - No invoice leaves draft without explicit approval.

@@ -112,6 +112,24 @@ enum InvoiceStatus: string
         };
     }
 
+    /**
+     * Whether the invoice opens at its client link.
+     *
+     * Wider than {@see self::isIssued()} by Approved. An approved invoice is
+     * already final, so its page shows nothing that can still change, and its
+     * token has not left the admin, so opening it early exposes nothing. That
+     * lets the operator follow the link in the email preview before sending —
+     * and a send whose status update fails after the mail went out still
+     * leaves the client a working link.
+     */
+    public function hasLiveClientLink(): bool
+    {
+        return match ($this) {
+            self::Approved, self::Sent, self::PartiallyPaid, self::Paid => true,
+            default => false,
+        };
+    }
+
     public function isOpen(): bool
     {
         return match ($this) {

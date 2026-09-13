@@ -17,6 +17,7 @@ use App\Services\Billing\InvoiceSnapshotter;
 use App\Services\Billing\InvoiceTemplateRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\View;
 use Tests\TestCase;
@@ -562,9 +563,24 @@ final class CheckpointF6TrackerPullTemplateTest extends TestCase
 
     public function test_the_sync_command_reports_a_current_kit(): void
     {
-        $this->artisan('billing:sync-document-kit --check')
+        $kits = app(DocumentKitStore::class);
+        $vendored = (string) file_get_contents((string) $kits->pathFor('tracker-pull'));
+
+        $this->artisan('billing:sync-document-kit', ['--check' => true, '--from' => $this->upstreamCheckout($kits->body($vendored))])
             ->assertExitCode(0)
-            ->expectsOutputToContain('tracker-pull');
+            ->expectsOutputToContain('current');
+    }
+
+    public function test_the_sync_command_reports_a_stale_kit_without_touching_it(): void
+    {
+        $path = (string) app(DocumentKitStore::class)->pathFor('tracker-pull');
+        $vendored = (string) file_get_contents($path);
+
+        $this->artisan('billing:sync-document-kit', ['--check' => true, '--from' => $this->upstreamCheckout(".page { color: red; }\n")])
+            ->assertExitCode(1)
+            ->expectsOutputToContain('stale');
+
+        $this->assertSame($vendored, file_get_contents($path));
     }
 
     public function test_the_sync_command_rejects_an_unknown_kit(): void
@@ -572,6 +588,22 @@ final class CheckpointF6TrackerPullTemplateTest extends TestCase
         $this->artisan('billing:sync-document-kit nope')
             ->assertExitCode(1)
             ->expectsOutputToContain('Unknown kit');
+    }
+
+    /**
+     * A stand-in for the upstream repository, holding the kit where the
+     * command reads it. The real checkout sits beside this one only on a
+     * developer's machine, so pointing at it would fail anywhere else.
+     */
+    private function upstreamCheckout(string $css): string
+    {
+        $root = sys_get_temp_dir().DIRECTORY_SEPARATOR.'kit-upstream-'.uniqid();
+        File::ensureDirectoryExists($root.'/templates/kit');
+        File::put($root.'/templates/kit/tracker-pull-doc.css', $css);
+
+        $this->beforeApplicationDestroyed(fn (): bool => File::deleteDirectory($root));
+
+        return $root;
     }
 
     /**

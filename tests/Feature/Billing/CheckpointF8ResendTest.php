@@ -27,7 +27,7 @@ use Tests\TestCase;
 /**
  * Sending an invoice again.
  *
- * Mark Sent only runs once, on the way out of Approved, so an invoice that
+ * Email Invoice only runs once, on the way out of Approved, so an invoice that
  * went to the wrong address had no way back to the right one. Resend is that
  * way back — and because a wrong address is the usual reason for it, it can
  * also replace the client link and restart the client's payment terms in the
@@ -210,7 +210,7 @@ final class CheckpointF8ResendTest extends TestCase
 
     // ---- Refusals ----------------------------------------------------------
 
-    public function test_an_invoice_that_was_never_sent_is_pointed_at_mark_sent(): void
+    public function test_an_invoice_that_was_never_sent_is_pointed_at_email_invoice(): void
     {
         $admin = $this->createAdmin();
 
@@ -221,7 +221,7 @@ final class CheckpointF8ResendTest extends TestCase
             $this->actingAs($admin)
                 ->postJson(route('admin.billing.invoices.resend', $invoice), ['recipient' => 'client@client.test'])
                 ->assertStatus(422)
-                ->assertJsonPath('message', "Invoice {$invoice->invoice_number} has not been sent yet — use Mark Sent to send it the first time.");
+                ->assertJsonPath('message', "Invoice {$invoice->invoice_number} has not been sent yet — use Email Invoice to send it the first time.");
         }
 
         Mail::assertNothingSent();
@@ -250,7 +250,7 @@ final class CheckpointF8ResendTest extends TestCase
 
     public function test_a_failed_send_does_not_claim_the_client_has_it(): void
     {
-        // The same promise Mark Sent makes: `sent_at` only moves once the mail
+        // The same promise Email Invoice makes: `sent_at` only moves once the mail
         // has actually been handed off.
         $invoice = $this->sentInvoice();
         $before = $invoice->sent_at;

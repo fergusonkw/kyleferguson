@@ -27,11 +27,11 @@ final class ResendInvoiceRequest extends FormRequest
 
             // The same floor the due-date control applies: a date before the
             // issue date would be past due the moment the client received it.
-            'due_on' => array_values(array_filter([
+            'due_on' => array_filter([
                 'nullable',
                 'date',
                 $issuedOn !== null ? 'after_or_equal:'.$issuedOn->toDateString() : null,
-            ])),
+            ]),
 
             'replace_link' => ['nullable', 'boolean'],
             'client_message' => ['nullable', 'string', 'max:'.Invoice::CLIENT_MESSAGE_MAX_LENGTH],

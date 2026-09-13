@@ -103,6 +103,13 @@ jobs:
           mkdir -p database
           touch database/database.sqlite
 
+      # Invoice PDF tests drive Puppeteer's Chromium. Ubuntu 24.04 blocks the
+      # unprivileged user namespaces its sandbox needs, so it refuses to start
+      # ("No usable sandbox!"). Lifting the restriction on this throwaway runner
+      # keeps the sandbox on, rather than launching Chromium with --no-sandbox.
+      - name: Allow Chromium's sandbox
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
       - name: Execute tests
         env:
           DB_CONNECTION: sqlite

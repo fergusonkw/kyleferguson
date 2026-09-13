@@ -89,8 +89,9 @@
                 @endcan
                 @can('send', $invoice)
                     @if($invoice->status === \App\Enums\Billing\InvoiceStatus::Approved)
-                        <button type="button" class="btn btn-sm btn-primary" id="sentBtn">
-                            <i data-lucide="mail" class="size-4 me-1"></i> Mark Sent
+                        <button type="button" class="btn btn-sm btn-primary" id="sentBtn"
+                                data-recipient="{{ $invoice->firstSendRecipient() }}">
+                            <i data-lucide="mail" class="size-4 me-1"></i> Email Invoice
                         </button>
                     @elseif($invoice->status->isIssued())
                         <button type="button" class="btn btn-sm btn-light" id="resendBtn">
@@ -306,9 +307,9 @@
                 @include('admin-v2.billing.invoices.partials.emails')
             @endif
 
-            @if($invoice->status->isIssued())
-                {{-- Only an issued invoice resolves at its link, so only an
-                     issued one has a link worth showing or replacing. --}}
+            @if($invoice->status->hasLiveClientLink())
+                {{-- Only a link that opens is worth showing or replacing:
+                     from approval on, not while a draft or once voided. --}}
                 <x-admin-v2.card title="Client Link" class="mt-5">
                     <p class="text-xs text-default-400 mb-3">
                         Anyone with this link can view the invoice and download its PDF — no login.
@@ -585,11 +586,21 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // Whatever is in the message box goes with the email, saved or not.
-    document.getElementById('sentBtn')?.addEventListener('click', async () => {
-        const body = new FormData();
+    document.getElementById('sentBtn')?.addEventListener('click', async (e) => {
+        const recipient = e.currentTarget.dataset.recipient;
         const message = document.querySelector('#clientMessageForm [name="client_message"]');
+        const withMessage = message && message.value.trim() !== '' ? ', along with your message' : '';
+
+        const ok = await Alert.confirm(
+            `The invoice and its PDF will be emailed to ${recipient}${withMessage}.`,
+            'Email this invoice?',
+            'Send',
+        );
+        if (!ok) return;
+
+        const body = new FormData();
         if (message) body.append('client_message', message.value);
-        report(await post(`${base}/sent`, body), 'Could not mark as sent.');
+        report(await post(`${base}/sent`, body), 'Could not email the invoice.');
     });
 
     document.getElementById('saveClientMessageBtn')?.addEventListener('click', async () => {
