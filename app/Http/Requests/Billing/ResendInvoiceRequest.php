@@ -34,6 +34,7 @@ final class ResendInvoiceRequest extends FormRequest
             ])),
 
             'replace_link' => ['nullable', 'boolean'],
+            'client_message' => ['nullable', 'string', 'max:'.Invoice::CLIENT_MESSAGE_MAX_LENGTH],
         ];
     }
 
@@ -47,7 +48,23 @@ final class ResendInvoiceRequest extends FormRequest
             'recipient.email' => 'That is not a valid email address.',
             'due_on.after_or_equal' => 'The due date cannot fall before the issue date of '
                 .($this->invoice()->issued_on?->format('F j, Y') ?? 'the invoice').'.',
+            'client_message.max' => 'Keep the message under '.number_format(Invoice::CLIENT_MESSAGE_MAX_LENGTH).' characters.',
         ];
+    }
+
+    /**
+     * The message this email carries: what was in the dialog's box, or — sent
+     * from somewhere without one — the message the client last received.
+     */
+    public function clientMessage(): ?string
+    {
+        if (! $this->has('client_message')) {
+            return $this->invoice()->client_message;
+        }
+
+        $message = $this->validated('client_message');
+
+        return is_string($message) ? $message : null;
     }
 
     public function recipient(): string

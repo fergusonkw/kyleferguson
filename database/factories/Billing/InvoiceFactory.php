@@ -94,4 +94,15 @@ final class InvoiceFactory extends Factory
     {
         return $this->status(InvoiceStatus::Void);
     }
+
+    /**
+     * An invoice issued before the system kept the books, being entered for
+     * the record.
+     */
+    public function historical(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'is_historical' => true,
+        ]);
+    }
 }

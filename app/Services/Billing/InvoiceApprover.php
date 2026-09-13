@@ -9,6 +9,8 @@ use App\Enums\Billing\InvoiceStatus;
 use App\Exceptions\Billing\InvalidInvoiceTransition;
 use App\Models\Billing\Invoice;
 use App\Services\AuditLogger;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -34,6 +36,12 @@ final class InvoiceApprover
     public function approve(Invoice $invoice): Invoice
     {
         $this->assertCanTransitionTo($invoice, InvoiceStatus::Approved);
+
+        // Approving stamps today as the issue date, which for a past invoice
+        // is the one date it is certainly not.
+        if ($invoice->is_historical) {
+            throw InvalidInvoiceTransition::because($invoice, 'is a past invoice — record it as issued on its original date instead of approving it');
+        }
 
         if ($invoice->lines()->where('is_display_only', false)->doesntExist()) {
             throw InvalidInvoiceTransition::because($invoice, 'has no billable lines to approve');
@@ -77,6 +85,65 @@ final class InvoiceApprover
         $this->threshold->recordSupplyValue($approved);
 
         return $approved;
+    }
+
+    /**
+     * Draft to sent, for an invoice the client received before this system
+     * kept the books.
+     *
+     * It lands where approving and emailing it would have, but on the dates
+     * those things really happened, and without the email — the client has
+     * had it all along. `approved_at` is still today: it records when the
+     * invoice entered the books, which is the one thing that did happen now.
+     * The real issue date is also what the small-supplier threshold counts it
+     * on, so an old supply is not mistaken for this quarter's.
+     */
+    public function recordPastIssue(Invoice $invoice, CarbonInterface $issuedOn, ?CarbonInterface $dueOn = null): Invoice
+    {
+        if (! $invoice->is_historical || $invoice->status !== InvoiceStatus::Draft) {
+            throw InvalidInvoiceTransition::because($invoice, 'is not a past invoice waiting to be recorded');
+        }
+
+        if ($invoice->lines()->where('is_display_only', false)->doesntExist()) {
+            throw InvalidInvoiceTransition::because($invoice, 'has no lines yet — add them as they appeared on the original');
+        }
+
+        if (bccomp($invoice->total, '0.00', 2) === -1) {
+            throw InvalidInvoiceTransition::because($invoice, 'has a negative total and cannot be recorded');
+        }
+
+        $issuedOn = CarbonImmutable::parse($issuedOn)->startOfDay();
+        $dueOn = $dueOn !== null
+            ? CarbonImmutable::parse($dueOn)->startOfDay()
+            : $issuedOn->addDays($invoice->business->payment_terms_days);
+
+        if ($issuedOn->isFuture()) {
+            throw InvalidInvoiceTransition::because($invoice, 'cannot be recorded as issued on a date still to come');
+        }
+
+        if ($dueOn->lessThan($issuedOn)) {
+            throw InvalidInvoiceTransition::because($invoice, 'cannot fall due before the day it was issued');
+        }
+
+        $recorded = $this->apply($invoice, InvoiceStatus::Sent, function (Invoice $invoice) use ($issuedOn, $dueOn): void {
+            $this->snapshots->capture($invoice);
+
+            $invoice->forceFill([
+                'status' => InvoiceStatus::Sent,
+                'approved_at' => now(),
+                'issued_on' => $issuedOn->toDateString(),
+                'due_on' => $dueOn->toDateString(),
+                'sent_at' => $issuedOn,
+            ])->save();
+
+            // The copy on record carries the original's dates, since the
+            // template reads them off the invoice.
+            $this->documents->freeze($invoice, InvoiceDocumentReason::Recorded);
+        }, ['historical' => true, 'issued_on' => $issuedOn->toDateString()]);
+
+        $this->threshold->recordSupplyValue($recorded);
+
+        return $recorded;
     }
 
     /**

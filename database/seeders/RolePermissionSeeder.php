@@ -27,6 +27,7 @@ final class RolePermissionSeeder extends Seeder
                 PermissionEnum::DeleteUsers->value,
                 PermissionEnum::ViewRoles->value,
                 PermissionEnum::ViewAuditLogs->value,
+                PermissionEnum::ViewEmailLog->value,
                 PermissionEnum::ViewLogViewer->value,
                 PermissionEnum::ViewQueueMonitor->value,
                 PermissionEnum::ManageMaintenance->value,

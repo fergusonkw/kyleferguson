@@ -29,6 +29,14 @@
             {{ $greeting }} is your invoice for {{ $periodLabel }}.
             The PDF is attached, and you can view it online any time using the link below.
           </p>
+          {{-- The operator's own words for this invoice. Escaped, then given
+               its line breaks back, so nothing typed can become markup. --}}
+          @if(($messageParagraphs ?? []) !== [])
+            <div style="border-top:1px solid #2b2e36;margin:20px 0 18px;"></div>
+            @foreach($messageParagraphs as $paragraph)
+              <p style="margin:0 0 {{ $loop->last ? '0' : '14px' }};font-size:15px;color:#c9cad0;line-height:1.65;">{!! nl2br(e($paragraph)) !!}</p>
+            @endforeach
+          @endif
         </td>
       </tr>
 

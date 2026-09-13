@@ -38,9 +38,10 @@ return [
     ],
 
     'smtp2go' => [
-        // Shared secret embedded in the inbound webhook URL path. SMTP2Go's
-        // free tier cannot HMAC-sign webhook requests, so a hard-to-guess
-        // path segment compared in constant time is the available control.
+        // Shared secret for the delivery webhook at /api/webhooks/smtp2go.
+        // SMTP2Go cannot sign its webhooks, so it sends this in the
+        // Authorization header instead — as a bearer token, or as the
+        // password in basic auth. Unset, every webhook is refused.
         'webhook_secret' => env('SMTP2GO_WEBHOOK_SECRET'),
     ],
 

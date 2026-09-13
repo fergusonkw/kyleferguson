@@ -18,6 +18,7 @@ enum Permission: string
 
     // Operations / Observability
     case ViewAuditLogs = 'audit-logs.view';
+    case ViewEmailLog = 'email-log.view';
     case ViewLogViewer = 'log-viewer.view';
     case ViewQueueMonitor = 'queue-monitor.view';
     case ManageMaintenance = 'maintenance.manage';
@@ -49,7 +50,7 @@ enum Permission: string
         return match ($this) {
             self::ViewUsers, self::CreateUsers, self::UpdateUsers, self::DeleteUsers => 'User Management',
             self::ViewRoles, self::ManageRoles => 'Role Management',
-            self::ViewAuditLogs, self::ViewLogViewer, self::ViewQueueMonitor, self::ManageMaintenance => 'Operations',
+            self::ViewAuditLogs, self::ViewEmailLog, self::ViewLogViewer, self::ViewQueueMonitor, self::ManageMaintenance => 'Operations',
             self::ViewBilling, self::ManageBusinesses, self::ManageClients, self::ManageProjects, self::ManageCostProviders, self::ManageInvoices, self::ApproveInvoices => 'Billing',
         };
     }
@@ -64,6 +65,7 @@ enum Permission: string
             self::ViewRoles => 'View roles',
             self::ManageRoles => 'Manage roles & permissions',
             self::ViewAuditLogs => 'View audit logs',
+            self::ViewEmailLog => 'View email log',
             self::ViewLogViewer => 'View application logs',
             self::ViewQueueMonitor => 'View queue monitor',
             self::ManageMaintenance => 'Manage maintenance mode',

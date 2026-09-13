@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Enums\Permission;
+use App\Mail\Transport\TrackingSmtp2GoTransport;
 use App\Models\Billing\Business;
 use App\Models\Billing\Client as BillingClient;
 use App\Models\Billing\CostProvider;
@@ -30,6 +31,7 @@ use App\Services\Billing\Pdf\RetryingCloudflareDriver;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
@@ -56,6 +58,11 @@ final class AppServiceProvider extends ServiceProvider
     {
         $this->configureRateLimiters();
 
+        // Replaces the package's SMTP2Go transport with one that keeps the
+        // email_id the delivery webhooks report against. Boots after the
+        // package's provider, so this registration wins.
+        Mail::extend('smtp2go', fn (): TrackingSmtp2GoTransport => $this->app->make(TrackingSmtp2GoTransport::class));
+
         Gate::policy(User::class, UserPolicy::class);
         Gate::policy(Role::class, RolePolicy::class);
         Gate::policy(Business::class, BusinessPolicy::class);
@@ -68,6 +75,7 @@ final class AppServiceProvider extends ServiceProvider
 
         // Permission-backed gates for resources without an Eloquent model.
         Gate::define('viewAny-audit-logs', fn (User $user) => $user->hasPermission(Permission::ViewAuditLogs->value));
+        Gate::define('viewAny-email-log', fn (User $user) => $user->hasPermission(Permission::ViewEmailLog->value));
         Gate::define('viewAny-log-viewer', fn (User $user) => $user->hasPermission(Permission::ViewLogViewer->value));
         Gate::define('viewAny-queue-monitor', fn (User $user) => $user->hasPermission(Permission::ViewQueueMonitor->value));
         Gate::define('viewAny-maintenance', fn (User $user) => $user->hasPermission(Permission::ManageMaintenance->value));

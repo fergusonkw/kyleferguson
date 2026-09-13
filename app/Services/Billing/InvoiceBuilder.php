@@ -17,6 +17,8 @@ use App\Models\Billing\RecurringLineTemplate;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
+use RuntimeException;
 
 /**
  * Builds a draft invoice for one client and period.
@@ -52,6 +54,15 @@ final class InvoiceBuilder
 
         if ($existing !== null && ! $existing->status->isEditable()) {
             return $existing;
+        }
+
+        // Its lines are the original's, typed in by hand. Deriving hosting and
+        // recurring lines into it would bill the client a second time.
+        if ($existing?->is_historical) {
+            throw new RuntimeException(sprintf(
+                '%s is a past invoice entered by hand from the original, so there is nothing to build it from.',
+                $existing->invoice_number,
+            ));
         }
 
         $business = $client->business;
@@ -93,6 +104,65 @@ final class InvoiceBuilder
             $this->recalculateTotals($invoice);
 
             return $invoice->fresh(['lines']);
+        });
+    }
+
+    /**
+     * Open an empty draft for an invoice the client received before this
+     * system kept the books, to be filled in from the original and recorded
+     * as issued on its real date.
+     *
+     * It takes the next number like any other invoice — the originals were
+     * numbered with this system in mind — but nothing is derived into it: the
+     * costs and recurring items on file for a period long past are not what
+     * the client was billed, and the original is the authority.
+     */
+    public function startPast(Client $client, string $period): Invoice
+    {
+        BillingPeriod::assertValid($period);
+
+        if ($period > now()->format('Y-m')) {
+            throw new InvalidArgumentException('A past invoice has to be for a month that has already started.');
+        }
+
+        $existing = Invoice::query()
+            ->where('client_id', $client->id)
+            ->where('period', $period)
+            ->first();
+
+        if ($existing !== null) {
+            throw new RuntimeException(sprintf(
+                '%s already has invoice %s for %s. A client has one invoice per period.',
+                $client->name,
+                $existing->invoice_number,
+                BillingPeriod::label($period),
+            ));
+        }
+
+        $currency = mb_strtoupper($client->billing_currency);
+        $fxRecord = $this->fxRates->rateRecordFor('USD', $currency, $period);
+
+        return DB::transaction(function () use ($client, $period, $currency, $fxRecord): Invoice {
+            $invoice = $this->openDraft(
+                $client,
+                $client->business,
+                $period,
+                BillingPeriod::start($period),
+                BillingPeriod::end($period),
+                $currency,
+            );
+
+            $invoice->forceFill([
+                'is_historical' => true,
+                'fx_rate_snapshot' => $fxRecord !== null ? (string) $fxRecord->rate : '1',
+                'fx_rate_source' => $fxRecord?->source->value ?? 'internal',
+                'fx_rate_period' => $period,
+            ]);
+
+            $this->snapshots->capture($invoice);
+            $invoice->save();
+
+            return $invoice;
         });
     }
 

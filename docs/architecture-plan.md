@@ -124,6 +124,18 @@ All views under `resources/views/admin-v2/billing/`. Extend `admin-v2.layouts.ve
 - `InvoiceGenerationNeedsAttention` — to operator on failure / missing inputs
 - `DraftReminderDigest` — to operator daily, lists unapproved drafts
 - `ClientInvoiceMail` — to client on approval; PDF attached + signed URL to hosted view. **Branded per business**: uses `email_template_view_snapshot` (a Blade Mailable template) so each business has its own header/logo/colors/footer. Default template lives at `resources/views/emails/invoices/default.blade.php`; per-business templates can override.
+  - **Message to client** *(2026-09-12)*: `invoices.client_message`, a plain-text write-up from the operator shown under the greeting (blank line = new paragraph; escaped, line breaks kept). Written on the invoice page until the first send — Mark Sent carries whatever is in the box, saved or not — and after that changed only through Resend, so it always holds what the client last received. A failed resend leaves the previous message. "Preview email" renders the unsaved text without storing it. Email only: not on the PDF or hosted page. Separate from the internal `notes` column.
+
+### Email delivery log *(built 2026-09-12)*
+
+Every email the application sends — not only billing mail — is recorded in `email_messages`, and SMTP2Go's delivery webhooks move each one's status along in `email_events`. Modelled on A&M Snow's email log, cut down to what a low-volume sender needs (no broadcast, bulk-send, priority queues or suppression list).
+
+- **Recording** is driven by Laravel's `MessageSending` / `MessageSent` events (`App\Listeners\Record*Email` → `App\Services\Mail\EmailDeliveryLog`), so a `Mail::to()->send()` anywhere is logged. A failed log write is reported and the email still goes.
+- **What it was about**: a mailable adds `EmailDeliveryLog::relatedTo($record)` to its envelope metadata. `ClientInvoiceMail` does, along with the `invoice_document_id` its PDF was rendered from, so `Invoice::emailMessages()` lists every email that carried the invoice and which captured document each attached.
+- **Content** is stored as sent (HTML + text; attachments as filename/size/sha256 only), except mail listed in `mail.delivery_log.withhold_content` — password reset and verification links.
+- **Transport**: `TrackingSmtp2GoTransport` replaces the motomedialab transport to keep SMTP2Go's `email_id` (the webhook join key), mark failed sends, send the API key as a header, and keep the key and attachments out of exception context.
+- **Webhook**: `POST /api/webhooks/smtp2go`, authenticated by `SMTP2GO_WEBHOOK_SECRET` in the Authorization header (bearer, or basic-auth password). Reports are matched on `email_id`; ones for mail this app did not send are acknowledged and dropped, so an account shared with Tracker Pull is harmless. Status only moves forward (`EmailStatus::canAdvanceTo()`); retries are de-duplicated by payload hash.
+- **UI**: `/admin/email-log` (permission `email-log.view`), an Emails card on the invoice page, and a red alert there when the latest email failed.
 
 ## Testing strategy
 
@@ -219,6 +231,10 @@ Decisions taken during the build that departed from the original sketch:
 - ~~Overpayment-to-credit logic in `InvoiceBuilder`~~ — **built** in Phase 3 (`addCarriedCredits`)
 - ~~Recurring line template UI~~ — **built** (`RecurringLineTemplateController`)
 - Placeholder hooks for future Stripe / Interac payment integration — **deferred** until there is an integration to build against
+- **Past invoices** *(built 2026-09-12)*: invoices the client received before the system kept the books, entered for the record. `invoices.is_historical`.
+  - "Record Past Invoice" on the invoice list calls `InvoiceBuilder::startPast()`. It opens an empty draft for any month that has already started. It takes the **next sequence number** by choice (the originals were numbered with this system in mind). It derives nothing; `build()`, Rebuild and Generate refuse it, and `approve()` refuses it.
+  - Lines are added by hand, then "Record as Issued" runs `PastInvoiceRecorder`. That calls `InvoiceApprover::recordPastIssue()` to go Draft → Sent, with `issued_on`, `due_on` and `sent_at` on the original dates and `approved_at` set to now. The document is frozen with reason `Recorded`, and `supply_value_cad` is set so the threshold counts it in its real quarter. In the same transaction it can record a full payment on its real date.
+  - No email is sent, and no client message applies. Tests: `CheckpointG6`.
 
 ## Deferred to later phases
 

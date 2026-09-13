@@ -35,9 +35,13 @@ final class InvoiceResender
         private readonly AuditLogger $audit,
     ) {}
 
+    /**
+     * @param  string|null  $clientMessage  the message this email carries; null for none
+     */
     public function resend(
         Invoice $invoice,
         string $recipient,
+        ?string $clientMessage,
         ?CarbonInterface $dueOn = null,
         bool $replaceLink = false,
     ): Invoice {
@@ -70,6 +74,12 @@ final class InvoiceResender
         // earlier capture stays, as the record of the first send.
         $this->pdf->freeze($invoice->refresh(), InvoiceDocumentReason::Resent);
 
+        // Carried by this email but saved only with `sent_at` below: the
+        // invoice's message is what the client last received, and a send
+        // that fails leaves them holding the previous one.
+        $previousMessage = $invoice->client_message;
+        $invoice->client_message = $clientMessage;
+
         Mail::to($recipient)->send(new ClientInvoiceMail($invoice));
 
         // Only once the mail is handed off, the same promise Mark Sent makes.
@@ -91,6 +101,7 @@ final class InvoiceResender
                 'sent_at' => $invoice->sent_at->toIso8601String(),
                 'due_on' => $invoice->due_on?->toDateString(),
                 'link_replaced' => $replaceLink,
+                'message_changed' => $invoice->client_message !== $previousMessage,
             ],
             ['billing', 'invoice'],
         );

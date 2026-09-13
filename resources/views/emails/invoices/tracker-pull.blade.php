@@ -48,6 +48,11 @@
             <strong style="color:{{ $charcoal }};font-weight:600;">{{ $invoice->invoice_number }}</strong>
             for {{ $periodLabel }}. The PDF is attached, and you can view it online any time using the link below.
           </p>
+          {{-- The operator's own words for this invoice. Escaped, then given
+               its line breaks back, so nothing typed can become markup. --}}
+          @foreach($messageParagraphs ?? [] as $paragraph)
+            <p style="margin:{{ $loop->first ? '18px' : '12px' }} 0 0;font-size:14px;color:#374151;line-height:1.65;">{!! nl2br(e($paragraph)) !!}</p>
+          @endforeach
         </td>
       </tr>
 

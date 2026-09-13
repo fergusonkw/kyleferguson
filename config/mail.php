@@ -124,6 +124,25 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Email Delivery Log
+    |--------------------------------------------------------------------------
+    |
+    | Every message the application sends is recorded in `email_messages`,
+    | body included, so the log shows exactly what went out. These mailables
+    | and notifications carry a credential — a password reset or verification
+    | link — so their body is never kept.
+    |
+    */
+
+    'delivery_log' => [
+        'withhold_content' => [
+            Illuminate\Auth\Notifications\ResetPassword::class,
+            Illuminate\Auth\Notifications\VerifyEmail::class,
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Contact Form Recipient
     |--------------------------------------------------------------------------
     |

@@ -22,6 +22,9 @@
                 <div class="flex items-center gap-3">
                     <h4 class="text-lg font-semibold mb-0">{{ $invoice->client->name }}</h4>
                     <span class="badge bg-{{ $invoice->status->badgeColor() }}">{{ $invoice->status->label() }}</span>
+                    @if($invoice->is_historical)
+                        <span class="badge bg-default/15 text-default-500" title="Issued before this system kept the books, and entered for the record">Past invoice</span>
+                    @endif
                 </div>
                 <p class="text-sm text-default-500 mt-1">
                     {{ \App\Services\Billing\BillingPeriod::label($invoice->period) }}
@@ -35,7 +38,8 @@
                 </p>
 
                 @can('approve', $invoice)
-                    @if($invoice->status !== \App\Enums\Billing\InvoiceStatus::Void)
+                    {{-- A past invoice takes its due date when it is recorded. --}}
+                    @if($invoice->status !== \App\Enums\Billing\InvoiceStatus::Void && ! ($isDraft && $invoice->is_historical))
                         <div class="flex items-center gap-2 mt-3">
                             <label for="dueOnInput" class="text-xs text-default-400">Due date</label>
                             <input type="date" id="dueOnInput" class="form-input form-input-sm w-40"
@@ -66,12 +70,18 @@
                     </a>
                 @endif
                 @can('update', $invoice)
-                    <button type="button" class="btn btn-sm btn-light" id="regenerateBtn">
-                        <i data-lucide="refresh-cw" class="size-4 me-1"></i> Rebuild
-                    </button>
+                    @unless($invoice->is_historical)
+                        <button type="button" class="btn btn-sm btn-light" id="regenerateBtn">
+                            <i data-lucide="refresh-cw" class="size-4 me-1"></i> Rebuild
+                        </button>
+                    @endunless
                 @endcan
                 @can('approve', $invoice)
-                    @if($invoice->status === \App\Enums\Billing\InvoiceStatus::Draft)
+                    @if($invoice->status === \App\Enums\Billing\InvoiceStatus::Draft && $invoice->is_historical)
+                        <button type="button" class="btn btn-sm btn-primary" id="recordPastBtn">
+                            <i data-lucide="history" class="size-4 me-1"></i> Record as Issued
+                        </button>
+                    @elseif($invoice->status === \App\Enums\Billing\InvoiceStatus::Draft)
                         <button type="button" class="btn btn-sm btn-primary" id="approveBtn">
                             <i data-lucide="circle-check" class="size-4 me-1"></i> Approve
                         </button>
@@ -111,6 +121,22 @@
             message="This invoice has left draft, so its lines are locked. Corrections are made by voiding it and issuing a replacement."
         />
     @endunless
+
+    @if($isDraft && $invoice->is_historical)
+        <x-admin-v2.alert
+            type="info"
+            title="A past invoice, being entered for the record"
+            message="Add its lines as they appeared on the original — its costs are never built in. Then record it as issued on the original date, with the payment if it was paid. Nothing is emailed."
+        />
+    @endif
+
+    @if($invoice->emailMessages->first()?->status->isFailure())
+        <x-admin-v2.alert
+            type="danger"
+            :title="'The last email did not reach '.$invoice->emailMessages->first()->to_address"
+            :message="($invoice->emailMessages->first()->error ?? $invoice->emailMessages->first()->status->label()).' — check the address and resend.'"
+        />
+    @endif
 
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-5">
         <div class="xl:col-span-2">
@@ -223,6 +249,8 @@
                     </table>
                 </div>
             </x-admin-v2.card>
+
+            @include('admin-v2.billing.invoices.partials.client-message')
         </div>
 
         <div>
@@ -273,6 +301,10 @@
                     @endforelse
                 </div>
             </x-admin-v2.card>
+
+            @if($invoice->emailMessages->isNotEmpty())
+                @include('admin-v2.billing.invoices.partials.emails')
+            @endif
 
             @if($invoice->status->isIssued())
                 {{-- Only an issued invoice resolves at its link, so only an
@@ -404,6 +436,17 @@
                         </button>
                     </p>
 
+                    {{-- Its own id: an invoice paid without ever being emailed shows
+                         the message card's box on the same page. --}}
+                    <div class="mb-5">
+                        <label for="resend_client_message" class="form-label">Message</label>
+                        <textarea id="resend_client_message" name="client_message" rows="5"
+                                  class="form-textarea">{{ $invoice->client_message }}</textarea>
+                        <p class="text-xs text-default-400 mt-1">
+                            Goes in this email, under the greeting — keep what the client last received, or change it.
+                        </p>
+                    </div>
+
                     <x-admin-v2.form.checkbox name="replace_link"
                         label="Replace the client link"
                         help="Tick this if the last email reached someone who should not have it. Their link stops working; this email carries the new one." />
@@ -416,6 +459,66 @@
                         <button type="button" class="btn btn-light" data-hs-overlay="#resendOffcanvas">Cancel</button>
                         <button type="submit" class="btn btn-primary" id="resendSubmitBtn">
                             <i data-lucide="mail" class="size-4 me-1"></i><span class="btn-text">Resend</span>
+                        </button>
+                    </div>
+                </form>
+            </x-admin-v2.offcanvas>
+        @endif
+    @endcan
+
+    @can('approve', $invoice)
+        @if($isDraft && $invoice->is_historical)
+            {{-- Fields carry their own ids: the payment form's are on this page too. --}}
+            <x-admin-v2.offcanvas canvasId="recordPastOffcanvas" title="Record as Issued" size="medium">
+                <form id="recordPastForm">
+                    @csrf
+                    <p class="text-sm text-default-500 mb-4">
+                        Enters {{ $invoice->invoice_number }} on the dates things really happened. Nothing is
+                        emailed — the client has had it all along.
+                    </p>
+
+                    <div class="mb-5">
+                        <label for="record_issued_on" class="form-label">Issued on <span class="text-danger">*</span></label>
+                        <input type="date" id="record_issued_on" name="issued_on" class="form-input" required
+                               max="{{ now()->toDateString() }}">
+                        <p class="text-xs text-default-400 mt-1">
+                            The date on the original. The GST/HST threshold counts the invoice on this date, not today.
+                        </p>
+                    </div>
+
+                    <div class="mb-5">
+                        <label for="record_due_on" class="form-label">Due on</label>
+                        <input type="date" id="record_due_on" name="due_on" class="form-input">
+                        <p class="text-xs text-default-400 mt-1">
+                            Leave empty for {{ $invoice->business->payment_terms_days }} days after the issue date.
+                        </p>
+                    </div>
+
+                    <div class="flex items-center gap-2 mb-4">
+                        <input type="checkbox" id="record_paid" name="paid" value="1" checked
+                               class="form-checkbox form-checkbox-light size-4.25">
+                        <label for="record_paid" class="text-sm">It was paid in full</label>
+                    </div>
+
+                    <div id="recordPastPayment">
+                        <div class="mb-5">
+                            <label for="record_paid_on" class="form-label">Paid on <span class="text-danger">*</span></label>
+                            <input type="date" id="record_paid_on" name="paid_on" class="form-input" required
+                                   max="{{ now()->toDateString() }}">
+                        </div>
+                        <x-admin-v2.form.select name="method" id="record_method" label="Method" :required="true"
+                                                :options="$paymentMethods" />
+                        <div class="mb-5">
+                            <label for="record_reference" class="form-label">Reference</label>
+                            <input type="text" id="record_reference" name="reference" class="form-input"
+                                   maxlength="255" placeholder="ETR-99120">
+                        </div>
+                    </div>
+
+                    <div class="border-t border-default-200 flex gap-2 justify-end pt-4 mt-4">
+                        <button type="button" class="btn btn-light" data-hs-overlay="#recordPastOffcanvas">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="recordPastSubmitBtn">
+                            <i data-lucide="check" class="size-4 me-1"></i><span class="btn-text">Record</span>
                         </button>
                     </div>
                 </form>
@@ -481,8 +584,47 @@ document.addEventListener('DOMContentLoaded', function () {
         report(await post(`${base}/approve`), 'Could not approve.');
     });
 
+    // Whatever is in the message box goes with the email, saved or not.
     document.getElementById('sentBtn')?.addEventListener('click', async () => {
-        report(await post(`${base}/sent`), 'Could not mark as sent.');
+        const body = new FormData();
+        const message = document.querySelector('#clientMessageForm [name="client_message"]');
+        if (message) body.append('client_message', message.value);
+        report(await post(`${base}/sent`, body), 'Could not mark as sent.');
+    });
+
+    document.getElementById('saveClientMessageBtn')?.addEventListener('click', async () => {
+        const body = new FormData(document.getElementById('clientMessageForm'));
+        body.append('_method', 'PATCH');
+        report(await post(`${base}/client-message`, body), 'Could not save the message.');
+    });
+
+    document.getElementById('recordPastBtn')?.addEventListener('click', () => {
+        HSOverlay.open('#recordPastOffcanvas');
+    });
+
+    // Unticked, the payment fields are disabled rather than just hidden: a
+    // disabled field is neither validated by the browser nor submitted.
+    const paidToggle = document.getElementById('record_paid');
+    function syncPastPayment () {
+        const section = document.getElementById('recordPastPayment');
+        if (!paidToggle || !section) return;
+        section.classList.toggle('hidden', !paidToggle.checked);
+        section.querySelectorAll('input, select').forEach((field) => { field.disabled = !paidToggle.checked; });
+    }
+    paidToggle?.addEventListener('change', syncPastPayment);
+    syncPastPayment();
+
+    document.getElementById('recordPastForm')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const btn = document.getElementById('recordPastSubmitBtn');
+        btn.disabled = true;
+
+        try {
+            report(await post(`${base}/record-past`, new FormData(e.target)), 'Could not record the invoice.');
+        } finally {
+            btn.disabled = false;
+        }
     });
 
     document.getElementById('regenerateBtn')?.addEventListener('click', async () => {

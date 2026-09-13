@@ -9,7 +9,11 @@ use App\Enums\Billing\InvoiceStatus;
 use App\Enums\Billing\PaymentMethod;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Billing\GenerateInvoiceRequest;
+use App\Http\Requests\Billing\InvoiceClientMessageRequest;
+use App\Http\Requests\Billing\MarkInvoiceSentRequest;
+use App\Http\Requests\Billing\RecordPastInvoiceRequest;
 use App\Http\Requests\Billing\ResendInvoiceRequest;
+use App\Http\Requests\Billing\StartPastInvoiceRequest;
 use App\Http\Requests\Billing\StoreInvoiceLineRequest;
 use App\Mail\Billing\ClientInvoiceMail;
 use App\Models\Billing\Client;
@@ -22,8 +26,10 @@ use App\Services\Billing\FxRateService;
 use App\Services\Billing\InvoiceApprover;
 use App\Services\Billing\InvoiceBuilder;
 use App\Services\Billing\InvoiceLinkRotator;
+use App\Services\Billing\InvoiceNumberAllocator;
 use App\Services\Billing\InvoicePdfRenderer;
 use App\Services\Billing\InvoiceResender;
+use App\Services\Billing\PastInvoiceRecorder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -44,17 +50,21 @@ final class InvoiceController extends Controller
         private readonly AuditLogger $audit,
         private readonly InvoiceLinkRotator $linkRotator,
         private readonly InvoiceResender $resender,
+        private readonly PastInvoiceRecorder $pastInvoices,
     ) {}
 
-    public function index(): View
+    public function index(InvoiceNumberAllocator $numbers): View
     {
         $this->authorize('viewAny', Invoice::class);
 
+        $business = $this->currentBusiness->get();
+
         return view('admin-v2.billing.invoices.index', [
-            'currentBusiness' => $this->currentBusiness->get(),
+            'currentBusiness' => $business,
             'statuses' => InvoiceStatus::options(),
             'periods' => $this->periodChoices(),
             'defaultPeriod' => BillingPeriod::previous(),
+            'nextInvoiceNumber' => $business !== null ? $numbers->peek($business) : null,
         ]);
     }
 
@@ -99,9 +109,10 @@ final class InvoiceController extends Controller
                 'client' => e($invoice->client->name),
                 'period' => e(BillingPeriod::label($invoice->period)),
                 'status' => sprintf(
-                    '<span class="badge bg-%s">%s</span>',
+                    '<span class="badge bg-%s">%s</span>%s',
                     e($invoice->status->badgeColor()),
                     e($invoice->status->label()),
+                    $invoice->is_historical ? ' <span class="badge bg-default/15 text-default-500" title="Issued before this system kept the books">Past</span>' : '',
                 ),
                 'total' => '$'.number_format((float) $invoice->total, 2).' '.e($invoice->issue_currency),
                 'balance' => '$'.number_format((float) $invoice->balanceDue(), 2),
@@ -115,7 +126,7 @@ final class InvoiceController extends Controller
         $this->authorize('view', $invoice);
 
         return view('admin-v2.billing.invoices.show', [
-            'invoice' => $invoice->load(['client', 'business', 'topLevelLines.children', 'payments.recordedBy']),
+            'invoice' => $invoice->load(['client', 'business', 'topLevelLines.children', 'payments.recordedBy', 'emailMessages.events']),
             'lineTypes' => collect(InvoiceLineType::operatorEditable())
                 ->mapWithKeys(fn (InvoiceLineType $t): array => [$t->value => $t->label()])
                 ->all(),
@@ -158,17 +169,70 @@ final class InvoiceController extends Controller
     }
 
     /**
+     * Open a past invoice — one the client received before this system kept
+     * the books — to be filled in by hand from the original.
+     */
+    public function startPast(StartPastInvoiceRequest $request): JsonResponse
+    {
+        /** @var Client $client */
+        $client = Client::query()->findOrFail($request->validated('client_id'));
+
+        try {
+            $invoice = $this->builder->startPast($client, $request->period());
+        } catch (Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$invoice->invoice_number} started. Add its lines as they were on the original, then record it as issued.",
+            'redirect' => route('admin.billing.invoices.show', $invoice),
+        ]);
+    }
+
+    /**
+     * Record a past invoice as issued on its original date — and paid, if it
+     * was. Nothing is emailed.
+     */
+    public function recordPast(RecordPastInvoiceRequest $request, Invoice $invoice): JsonResponse
+    {
+        return $this->attempt(function () use ($request, $invoice): string {
+            $recorded = $this->pastInvoices->record(
+                $invoice,
+                $request->issuedOn(),
+                $request->dueOn(),
+                $request->paidOn(),
+                $request->paymentMethod(),
+                $request->reference(),
+                $request->user(),
+            );
+
+            return sprintf(
+                '%s recorded as issued %s%s. Nothing was emailed.',
+                $recorded->invoice_number,
+                $recorded->issued_on->format('F j, Y'),
+                $recorded->status === InvoiceStatus::Paid ? ' and paid' : '',
+            );
+        });
+    }
+
+    /**
      * Email the invoice to the client and record that it went.
      *
      * The status only moves after the mail is handed off, so `sent_at` means
      * "the client has it", not "we meant to send it".
      */
-    public function markSent(Invoice $invoice): JsonResponse
+    public function markSent(MarkInvoiceSentRequest $request, Invoice $invoice): JsonResponse
     {
-        $this->authorize('send', $invoice);
-
-        return $this->attempt(function () use ($invoice): string {
+        return $this->attempt(function () use ($request, $invoice): string {
             $this->approver->assertCanTransitionTo($invoice, InvoiceStatus::Sent);
+
+            // Saved ahead of the send, so text typed and not yet saved is not
+            // lost if the send fails — the invoice is still unsent, and its
+            // message still a draft.
+            if ($request->carriesClientMessage()) {
+                $invoice->update(['client_message' => $request->clientMessage()]);
+            }
 
             $recipient = $invoice->client_snapshot['contact_email']
                 ?? $invoice->client->contact_email;
@@ -199,10 +263,52 @@ final class InvoiceController extends Controller
     public function resend(ResendInvoiceRequest $request, Invoice $invoice): JsonResponse
     {
         return $this->attempt(function () use ($request, $invoice): string {
-            $this->resender->resend($invoice, $request->recipient(), $request->dueOn(), $request->replacesLink());
+            $this->resender->resend(
+                $invoice,
+                $request->recipient(),
+                $request->clientMessage(),
+                $request->dueOn(),
+                $request->replacesLink(),
+            );
 
             return "{$invoice->invoice_number} re-sent to {$request->recipient()}.";
         });
+    }
+
+    /**
+     * Save the message the invoice email will carry.
+     */
+    public function updateClientMessage(InvoiceClientMessageRequest $request, Invoice $invoice): JsonResponse
+    {
+        if (! $invoice->acceptsClientMessage()) {
+            return response()->json([
+                'success' => false,
+                'message' => $invoice->status === InvoiceStatus::Void
+                    ? 'A voided invoice is not emailed, so it takes no message.'
+                    : 'This invoice has been emailed, so its message records what the client received. Resend it to send a different one.',
+            ], 422);
+        }
+
+        $invoice->update(['client_message' => $request->clientMessage()]);
+
+        return response()->json([
+            'success' => true,
+            'message' => $invoice->client_message === null
+                ? 'Message removed. The email will use the standard wording.'
+                : 'Message saved. It goes out with the invoice email.',
+        ]);
+    }
+
+    /**
+     * The client email as it would go now, carrying the message box's current
+     * text. Nothing is saved, so the preview can be checked before committing
+     * to the wording.
+     */
+    public function previewEmail(InvoiceClientMessageRequest $request, Invoice $invoice): Response
+    {
+        $invoice->client_message = $request->clientMessage();
+
+        return response((new ClientInvoiceMail($invoice))->render());
     }
 
     /**

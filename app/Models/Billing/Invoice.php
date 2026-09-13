@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Models\Billing;
 
 use App\Enums\Billing\InvoiceStatus;
+use App\Models\EmailMessage;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Str;
 
 /**
@@ -24,6 +27,7 @@ use Illuminate\Support\Str;
  * @property \Illuminate\Support\Carbon|null $issued_on
  * @property \Illuminate\Support\Carbon|null $due_on
  * @property InvoiceStatus $status
+ * @property bool $is_historical
  * @property string $issue_currency
  * @property string $subtotal
  * @property string $tax_total
@@ -42,6 +46,7 @@ use Illuminate\Support\Str;
  * @property \Illuminate\Support\Carbon|null $voided_at
  * @property string $hosted_view_token
  * @property string|null $notes
+ * @property string|null $client_message
  * @property-read Business $business
  * @property-read Client $client
  * @property-read \Illuminate\Database\Eloquent\Collection<int, InvoiceLine> $lines
@@ -49,6 +54,7 @@ use Illuminate\Support\Str;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Payment> $payments
  * @property-read \Illuminate\Database\Eloquent\Collection<int, InvoiceDocument> $documents
  * @property-read InvoiceDocument|null $issuedDocument
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, EmailMessage> $emailMessages
  *
  * @method static \Database\Factories\Billing\InvoiceFactory factory($count = null, $state = [])
  *
@@ -58,6 +64,12 @@ final class Invoice extends Model
 {
     /** @use HasFactory<\Database\Factories\Billing\InvoiceFactory> */
     use HasFactory;
+
+    /**
+     * Long enough for a proper write-up of the month; short enough that the
+     * invoice is still the point of the email.
+     */
+    public const CLIENT_MESSAGE_MAX_LENGTH = 5000;
 
     /** @var list<string> */
     protected $fillable = [
@@ -87,6 +99,7 @@ final class Invoice extends Model
         'voided_at',
         'hosted_view_token',
         'notes',
+        'client_message',
     ];
 
     public static function generateHostedViewToken(): string
@@ -152,6 +165,30 @@ final class Invoice extends Model
     }
 
     /**
+     * Every email that carried this invoice, most recent first.
+     *
+     * @return MorphMany<EmailMessage, $this>
+     */
+    public function emailMessages(): MorphMany
+    {
+        return $this->morphMany(EmailMessage::class, 'related')->orderByDesc('id');
+    }
+
+    /**
+     * Whether the message can still be changed on its own. Once the client has
+     * been emailed it records what they were sent, so from then on it changes
+     * only with a resend.
+     */
+    public function acceptsClientMessage(): bool
+    {
+        // A past invoice is recorded, never emailed, so it has no message to
+        // write — until someone resends it, which carries its own.
+        return $this->sent_at === null
+            && $this->status !== InvoiceStatus::Void
+            && ! $this->is_historical;
+    }
+
+    /**
      * @param  Builder<Invoice>  $query
      * @return Builder<Invoice>
      */
@@ -206,6 +243,21 @@ final class Invoice extends Model
     }
 
     /**
+     * The note the client email carries. Held with Unix line endings, and a
+     * box left blank is no message rather than an empty one.
+     *
+     * @return Attribute<string|null, string|null>
+     */
+    protected function clientMessage(): Attribute
+    {
+        return Attribute::make(set: function (?string $value): ?string {
+            $message = trim(str_replace(["\r\n", "\r"], "\n", (string) $value));
+
+            return $message !== '' ? $message : null;
+        });
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
@@ -216,6 +268,7 @@ final class Invoice extends Model
             'issued_on' => 'date',
             'due_on' => 'date',
             'status' => InvoiceStatus::class,
+            'is_historical' => 'boolean',
             'subtotal' => 'decimal:2',
             'tax_total' => 'decimal:2',
             'total' => 'decimal:2',

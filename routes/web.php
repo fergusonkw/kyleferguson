@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\Billing\ReceivablesController;
 use App\Http\Controllers\Admin\Billing\ReconciliationController;
 use App\Http\Controllers\Admin\Billing\RecurringLineTemplateController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\EmailLogController;
 use App\Http\Controllers\Admin\LogViewerController;
 use App\Http\Controllers\Admin\MaintenanceController;
 use App\Http\Controllers\Admin\QueueMonitorController;
@@ -112,6 +113,10 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'email.verified', '2
     Route::get('audit-logs', [AuditLogController::class, 'index'])->name('audit-logs.index');
     Route::get('audit-logs/{auditLog}', [AuditLogController::class, 'show'])->name('audit-logs.show');
 
+    // Email log
+    Route::get('email-log', [EmailLogController::class, 'index'])->name('email-log.index');
+    Route::get('email-log/{emailMessage}', [EmailLogController::class, 'show'])->name('email-log.show');
+
     // Queue monitor
     Route::get('queue-monitor', [QueueMonitorController::class, 'index'])->name('queue-monitor.index');
     Route::get('queue-monitor/jobs', [QueueMonitorController::class, 'jobs'])->name('queue-monitor.jobs');
@@ -177,14 +182,18 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'email.verified', '2
         Route::get('invoices/data', [InvoiceController::class, 'data'])->name('invoices.data');
         Route::get('invoices/available-clients', [InvoiceController::class, 'availableClients'])->name('invoices.available-clients');
         Route::post('invoices/generate', [InvoiceController::class, 'generate'])->name('invoices.generate');
+        Route::post('invoices/past', [InvoiceController::class, 'startPast'])->name('invoices.past.start');
         Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
         Route::get('invoices/{invoice}/preview', [InvoiceController::class, 'preview'])->name('invoices.preview');
         Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'downloadPdf'])->name('invoices.pdf');
         Route::get('invoices/{invoice}/pdf/issued', [InvoiceController::class, 'downloadIssuedPdf'])->name('invoices.pdf.issued');
         Route::post('invoices/{invoice}/regenerate', [InvoiceController::class, 'regenerate'])->name('invoices.regenerate');
         Route::post('invoices/{invoice}/approve', [InvoiceController::class, 'approve'])->name('invoices.approve');
+        Route::post('invoices/{invoice}/record-past', [InvoiceController::class, 'recordPast'])->name('invoices.past.record');
         Route::post('invoices/{invoice}/sent', [InvoiceController::class, 'markSent'])->name('invoices.sent');
         Route::post('invoices/{invoice}/resend', [InvoiceController::class, 'resend'])->name('invoices.resend');
+        Route::patch('invoices/{invoice}/client-message', [InvoiceController::class, 'updateClientMessage'])->name('invoices.client-message');
+        Route::post('invoices/{invoice}/email-preview', [InvoiceController::class, 'previewEmail'])->name('invoices.email-preview');
         Route::post('invoices/{invoice}/void', [InvoiceController::class, 'void'])->name('invoices.void');
         Route::post('invoices/{invoice}/rotate-link', [InvoiceController::class, 'rotateLink'])->name('invoices.rotate-link');
         Route::patch('invoices/{invoice}/due-date', [InvoiceController::class, 'updateDueDate'])->name('invoices.due-date');

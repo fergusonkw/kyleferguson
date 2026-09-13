@@ -11,12 +11,14 @@ enum InvoiceDocumentReason: string
 {
     case Approved = 'approved';
     case Resent = 'resent';
+    case Recorded = 'recorded';
 
     public function label(): string
     {
         return match ($this) {
             self::Approved => 'Issued at approval',
             self::Resent => 'Re-issued on resend',
+            self::Recorded => 'Recorded after the fact',
         };
     }
 }

@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Mail\Billing;
 
 use App\Models\Billing\Invoice;
+use App\Models\Billing\InvoiceDocument;
 use App\Services\Billing\BillingPeriod;
 use App\Services\Billing\InvoicePdfRenderer;
+use App\Services\Mail\EmailDeliveryLog;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Address;
@@ -56,6 +58,7 @@ final class ClientInvoiceMail extends Mailable
                 $name,
                 BillingPeriod::label($this->invoice->period),
             ),
+            metadata: $this->deliveryLogMetadata(),
         );
     }
 
@@ -76,6 +79,8 @@ final class ClientInvoiceMail extends Mailable
                 'clientName' => $this->invoice->client_snapshot['name'] ?? $this->invoice->client->name,
                 'periodLabel' => BillingPeriod::label($this->invoice->period),
                 'hostedUrl' => route('invoices.hosted.show', $this->invoice->hosted_view_token),
+                'clientMessage' => $this->invoice->client_message,
+                'messageParagraphs' => $this->messageParagraphs(),
             ],
         );
     }
@@ -93,6 +98,44 @@ final class ClientInvoiceMail extends Mailable
                 $renderer->downloadFilename($this->invoice),
             )->withMime('application/pdf'),
         ];
+    }
+
+    /**
+     * The operator's message, one entry per paragraph — a blank line starts a
+     * new one, and the single line breaks inside a paragraph are kept.
+     *
+     * @return list<string>
+     */
+    private function messageParagraphs(): array
+    {
+        $message = (string) $this->invoice->client_message;
+
+        if ($message === '') {
+            return [];
+        }
+
+        return array_values(array_filter(
+            array_map(trim(...), preg_split('/\n\s*\n/', $message) ?: []),
+            fn (string $paragraph): bool => $paragraph !== '',
+        ));
+    }
+
+    /**
+     * Files this email under the invoice in the email log, with the captured
+     * document the attached PDF was rendered from — so the log can say which
+     * version of the invoice each email carried.
+     *
+     * @return array<string, string>
+     */
+    private function deliveryLogMetadata(): array
+    {
+        // The same document issuedPdf() renders: the latest capture.
+        $documentId = InvoiceDocument::query()->where('invoice_id', $this->invoice->id)->max('id');
+
+        return array_filter([
+            ...EmailDeliveryLog::relatedTo($this->invoice),
+            'invoice_document_id' => $documentId !== null ? (string) $documentId : null,
+        ]);
     }
 
     /**

@@ -50,6 +50,17 @@ final class InvoicePolicy
     }
 
     /**
+     * The message the client email carries, written by whoever prepares the
+     * draft or sends it. Whether the invoice still takes one is its state's
+     * call — see Invoice::acceptsClientMessage() — and holds for super admins
+     * too, who never reach this method.
+     */
+    public function writeClientMessage(User $user, Invoice $invoice): bool
+    {
+        return $this->update($user, $invoice) || $this->send($user, $invoice);
+    }
+
+    /**
      * Replacing the client link decides who can read the invoice, which is
      * the same call as sending it — so it sits behind the issuing permission.
      */

@@ -34,6 +34,7 @@
                         $canViewSystemSection = Gate::allows('viewAny', App\Models\User::class)
                             || Gate::allows('viewAny', App\Models\Role::class)
                             || Gate::allows('viewAny-audit-logs')
+                            || Gate::allows('viewAny-email-log')
                             || Gate::allows('viewAny-queue-monitor')
                             || Gate::allows('viewAny-log-viewer')
                             || Gate::allows('viewAny-maintenance');
@@ -65,6 +66,15 @@
                         <a href="{{ route('admin.audit-logs.index') }}" class="menu-link">
                             <span class="menu-icon"><i data-lucide="file-bar-chart-2"></i></span>
                             <span class="menu-text">Audit Logs</span>
+                        </a>
+                    </li>
+                    @endcan
+
+                    @can('viewAny-email-log')
+                    <li class="menu-item">
+                        <a href="{{ route('admin.email-log.index') }}" class="menu-link">
+                            <span class="menu-icon"><i data-lucide="mail-check"></i></span>
+                            <span class="menu-text">Email Log</span>
                         </a>
                     </li>
                     @endcan

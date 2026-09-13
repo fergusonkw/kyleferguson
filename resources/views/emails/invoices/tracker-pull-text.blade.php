@@ -5,10 +5,16 @@
     // directive that a word character butts against, so `here@else` would pass
     // straight through into the sent mail as literal text.
     $greeting = $firstName !== '' ? $firstName.', here' : 'Here';
+    // The client message is printed raw below. This part is plain text, and
+    // escaping would turn every apostrophe in it into &#039;.
 @endphp
 Invoice {{ $invoice->invoice_number }} from {{ $businessName }}
 
 {{ $greeting }} is invoice {{ $invoice->invoice_number }} for {{ $periodLabel }}. The PDF is attached.
+@if(filled($clientMessage ?? null))
+
+{!! $clientMessage !!}
+@endif
 
 AMOUNT DUE{{ $invoice->due_on ? ' BY '.strtoupper($invoice->due_on->format('F j, Y')) : '' }}
 {{ $money($invoice->total) }} {{ $invoice->issue_currency }}

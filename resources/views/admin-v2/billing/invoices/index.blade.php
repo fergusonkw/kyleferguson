@@ -13,6 +13,9 @@
         <x-admin-v2.card title="{{ $currentBusiness->name }} — Invoices">
             <x-slot:headerActions>
                 @can('create', \App\Models\Billing\Invoice::class)
+                    <button type="button" class="btn btn-light btn-sm" id="pastInvoiceBtn">
+                        <i data-lucide="history" class="size-4 me-1"></i> Record Past Invoice
+                    </button>
                     <button type="button" class="btn btn-primary btn-sm" id="generateInvoiceBtn">
                         <i data-lucide="plus" class="size-4 me-1"></i> Generate Draft
                     </button>
@@ -80,6 +83,34 @@
             </div>
         </form>
     </x-admin-v2.offcanvas>
+
+    <x-admin-v2.offcanvas canvasId="pastOffcanvas" title="Record Past Invoice" size="medium">
+        <form id="pastForm">
+            @csrf
+            <p class="text-sm text-default-500 mb-4">
+                For an invoice the client received before this system kept the books. It takes the next
+                invoice number{{ $nextInvoiceNumber ? ' — '.$nextInvoiceNumber.' —' : '' }} and starts empty:
+                you add its lines as they were on the original, then record it as issued on its real date,
+                paid if it was. Nothing is emailed. Entering several? Go oldest first, so the numbers run in
+                date order.
+            </p>
+            <x-admin-v2.form.select name="client_id" id="past_client_id" label="Client" :required="true" :options="[]" placeholder="Select a client" />
+            <div class="mb-5">
+                <label for="past_period" class="form-label">Month it billed <span class="text-danger">*</span></label>
+                <input type="month" id="past_period" name="period" class="form-input" required
+                       max="{{ now()->format('Y-m') }}">
+                <p class="text-xs text-default-400 mt-1">A client has one invoice per month, so this has to be a month without one.</p>
+            </div>
+
+            <div class="border-t border-default-200 flex gap-2 justify-end pt-4 mt-4">
+                <button type="button" class="btn btn-light" data-hs-overlay="#pastOffcanvas">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="pastSubmitBtn">
+                    <i data-lucide="check" class="size-4 me-1"></i>
+                    <span class="btn-text">Start</span>
+                </button>
+            </div>
+        </form>
+    </x-admin-v2.offcanvas>
 @endsection
 
 @push('scripts')
@@ -92,7 +123,8 @@ document.addEventListener('DOMContentLoaded', function () {
     let clientsLoaded = false;
     setTimeout(() => { dataTable = window.dataTable_invoicesTable; }, 500);
 
-    const clientSelect = document.querySelector('select[name="client_id"]');
+    // The generate form and the past-invoice form each pick a client.
+    const clientSelects = document.querySelectorAll('select[name="client_id"]');
 
     /** Filters are applied by re-pointing the table's ajax url. */
     function applyFilters () {
@@ -115,12 +147,14 @@ document.addEventListener('DOMContentLoaded', function () {
             const r = await fetch(clientsUrl, { headers: { 'Accept': 'application/json' } });
             const data = await r.json();
             if (!data.success) return;
-            clientSelect.innerHTML = '<option value="">Select a client</option>';
-            data.clients.forEach((c) => {
-                const opt = document.createElement('option');
-                opt.value = c.id;
-                opt.textContent = c.name;
-                clientSelect.appendChild(opt);
+            clientSelects.forEach((select) => {
+                select.innerHTML = '<option value="">Select a client</option>';
+                data.clients.forEach((c) => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.textContent = c.name;
+                    select.appendChild(opt);
+                });
             });
             clientsLoaded = true;
         } catch { Alert.error('Could not load clients.'); }
@@ -131,29 +165,55 @@ document.addEventListener('DOMContentLoaded', function () {
         HSOverlay.open('#generateOffcanvas');
     });
 
-    document.getElementById('generateForm')?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const btn = document.getElementById('generateSubmitBtn');
-        const label = btn.querySelector('.btn-text');
-        const original = label.textContent;
-        btn.disabled = true; label.textContent = 'Generating...';
-        try {
-            const r = await fetch(generateUrl, {
-                method: 'POST',
-                headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
-                body: new FormData(e.target),
-            });
-            const data = await r.json();
-            if (data.success) {
-                HSOverlay.close('#generateOffcanvas');
-                Alert.toast(data.message, 'success');
-                window.location = data.redirect;
-            } else {
-                const msg = data.errors ? Object.values(data.errors).flat().join('<br>') : (data.message || 'Could not generate the draft.');
-                Alert.html(msg, 'Generation failed');
-            }
-        } catch { Alert.error('Could not generate the draft.'); }
-        finally { btn.disabled = false; label.textContent = original; }
+    document.getElementById('pastInvoiceBtn')?.addEventListener('click', async () => {
+        await loadClients();
+        HSOverlay.open('#pastOffcanvas');
+    });
+
+    /** Both forms create an invoice and land on it. */
+    function submitCreateForm (form, { url, overlay, button, busy, failure, title }) {
+        form?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById(button);
+            const label = btn.querySelector('.btn-text');
+            const original = label.textContent;
+            btn.disabled = true; label.textContent = busy;
+            try {
+                const r = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                    body: new FormData(e.target),
+                });
+                const data = await r.json();
+                if (data.success) {
+                    HSOverlay.close(overlay);
+                    Alert.toast(data.message, 'success');
+                    window.location = data.redirect;
+                } else {
+                    const msg = data.errors ? Object.values(data.errors).flat().join('<br>') : (data.message || failure);
+                    Alert.html(msg, title);
+                }
+            } catch { Alert.error(failure); }
+            finally { btn.disabled = false; label.textContent = original; }
+        });
+    }
+
+    submitCreateForm(document.getElementById('generateForm'), {
+        url: generateUrl,
+        overlay: '#generateOffcanvas',
+        button: 'generateSubmitBtn',
+        busy: 'Generating...',
+        failure: 'Could not generate the draft.',
+        title: 'Generation failed',
+    });
+
+    submitCreateForm(document.getElementById('pastForm'), {
+        url: @json(route('admin.billing.invoices.past.start')),
+        overlay: '#pastOffcanvas',
+        button: 'pastSubmitBtn',
+        busy: 'Starting...',
+        failure: 'Could not start the past invoice.',
+        title: 'Not started',
     });
 });
 </script>
