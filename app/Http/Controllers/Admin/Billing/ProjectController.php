@@ -66,7 +66,7 @@ final class ProjectController extends Controller
         $rows = $projects->map(fn (Project $p): array => [
             'id' => $p->id,
             'name' => e($p->name),
-            'client' => e($p->client?->name ?? '—'),
+            'client' => e($p->client->name),
             'do_linked' => $p->do_project_uuid
                 ? '<span class="badge bg-success">Linked</span>'
                 : '<span class="badge bg-default">Unlinked</span>',
@@ -255,14 +255,14 @@ final class ProjectController extends Controller
                 'recordsFiltered' => $total,
                 'data' => $rows->map(fn (ProviderResource $r): array => [
                     'id' => $r->id,
-                    'provider' => e($r->costProvider?->display_name ?? '—'),
+                    'provider' => e($r->costProvider->display_name),
                     'type' => e($r->resource_type),
                     'name' => e($r->name ?? '—'),
                     'do_project_name' => e($r->metadata['do_project_name'] ?? '—'),
                     'is_default' => ! empty($r->metadata['do_project_is_default'])
                         ? '<span class="badge bg-warning">Default Project</span>'
                         : '',
-                    'last_seen_at' => $r->last_seen_at?->diffForHumans() ?? '—',
+                    'last_seen_at' => $r->last_seen_at->diffForHumans(),
                 ])->all(),
             ]);
         }

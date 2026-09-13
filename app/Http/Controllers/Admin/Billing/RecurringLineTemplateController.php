@@ -37,7 +37,7 @@ final class RecurringLineTemplateController extends Controller
         return view('admin-v2.billing.recurring-lines.index', [
             'currentBusiness' => $business,
             'cadenceOptions' => RecurringCadence::options(),
-            'currencyOptions' => collect($business?->supported_currencies ?? ['CAD'])
+            'currencyOptions' => collect($business->supported_currencies ?? ['CAD'])
                 ->mapWithKeys(fn (string $c): array => [$c => $c])
                 ->all(),
         ]);
@@ -70,7 +70,7 @@ final class RecurringLineTemplateController extends Controller
                 'label' => e($t->label),
                 'applies_to' => $t->project !== null
                     ? e($t->project->client->name).' <span class="text-default-400">· '.e($t->project->name).'</span>'
-                    : e($t->client?->name ?? '—'),
+                    : e($t->client->name ?? '—'),
                 'amount' => '$'.number_format((float) $t->amount, 2).' '.e($t->currency),
                 'cadence' => e($t->cadence->label()),
                 'window' => $this->presentWindow($t),

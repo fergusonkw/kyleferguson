@@ -41,17 +41,17 @@ final class ProviderAdapterRegistry
 
     public function supportsResourceSync(CostProviderSlug $slug): bool
     {
-        return isset(self::ADAPTERS[$slug->value]['resource_sync']);
+        return isset($this->adaptersFor($slug)['resource_sync']);
     }
 
     public function supportsBillingSync(CostProviderSlug $slug): bool
     {
-        return isset(self::ADAPTERS[$slug->value]['billing_sync']);
+        return isset($this->adaptersFor($slug)['billing_sync']);
     }
 
     public function supportsCredentialValidation(CostProviderSlug $slug): bool
     {
-        return isset(self::ADAPTERS[$slug->value]['credential_validator']);
+        return isset($this->adaptersFor($slug)['credential_validator']);
     }
 
     public function resourceSyncFor(CostProviderSlug $slug): ResourceSyncAdapter
@@ -86,9 +86,22 @@ final class ProviderAdapterRegistry
         ));
     }
 
+    /**
+     * A provider's adapters as the map declares them — each capability
+     * optional — rather than as the constant happens to read today. Every
+     * current provider validates credentials, but the next one need not, so
+     * asking stays a real question.
+     *
+     * @return array{resource_sync?: class-string<ResourceSyncAdapter>, billing_sync?: class-string<BillingSyncAdapter>, credential_validator?: class-string<CredentialValidator>}
+     */
+    private function adaptersFor(CostProviderSlug $slug): array
+    {
+        return self::ADAPTERS[$slug->value];
+    }
+
     private function resolve(CostProviderSlug $slug, string $capability, string $label): object
     {
-        $class = self::ADAPTERS[$slug->value][$capability] ?? null;
+        $class = $this->adaptersFor($slug)[$capability] ?? null;
 
         if ($class === null) {
             throw UnsupportedProviderCapability::for($slug, $label);

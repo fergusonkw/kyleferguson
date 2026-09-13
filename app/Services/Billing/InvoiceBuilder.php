@@ -16,6 +16,7 @@ use App\Models\Billing\Project;
 use App\Models\Billing\RecurringLineTemplate;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use RuntimeException;
@@ -369,10 +370,10 @@ final class InvoiceBuilder
      * to the parent exactly — a breakdown that does not add up is worse than
      * no breakdown.
      *
-     * @param  Collection<string, Collection<int, CostLineItem>>  $groups
+     * @param  SupportCollection<string, Collection<int, CostLineItem>>  $groups
      * @return list<string>
      */
-    private function distribute(Collection $groups, string $totalCostUsd, string $charged): array
+    private function distribute(SupportCollection $groups, string $totalCostUsd, string $charged): array
     {
         $count = $groups->count();
 

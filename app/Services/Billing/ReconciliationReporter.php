@@ -80,8 +80,8 @@ final class ReconciliationReporter
 
                 return [
                     'project_id' => (int) $first->project_id,
-                    'project_name' => $first->project?->name ?? 'Unknown project',
-                    'client_name' => $first->project?->client->name ?? 'Unknown client',
+                    'project_name' => $first->project->name ?? 'Unknown project',
+                    'client_name' => $first->project->client->name ?? 'Unknown client',
                     'cost' => $this->sumLines($lines),
                 ];
             })
