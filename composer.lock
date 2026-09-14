@@ -2808,16 +2808,16 @@
         },
         {
             "name": "motomedialab/smtp2go",
-            "version": "v1.3.0",
+            "version": "v1.4.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/motomedialab/laravel-smtp2go.git",
-                "reference": "202a014bebf392545b8c398b2aa6fd7f840ce3cb"
+                "reference": "75a82bb7343fd0372d38cf177d93d354bbee26a8"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/motomedialab/laravel-smtp2go/zipball/202a014bebf392545b8c398b2aa6fd7f840ce3cb",
-                "reference": "202a014bebf392545b8c398b2aa6fd7f840ce3cb",
+                "url": "https://api.github.com/repos/motomedialab/laravel-smtp2go/zipball/75a82bb7343fd0372d38cf177d93d354bbee26a8",
+                "reference": "75a82bb7343fd0372d38cf177d93d354bbee26a8",
                 "shasum": ""
             },
             "require": {
@@ -2850,9 +2850,9 @@
             "description": "Send emails via API using the first-class email courier SMTP2Go",
             "support": {
                 "issues": "https://github.com/motomedialab/laravel-smtp2go/issues",
-                "source": "https://github.com/motomedialab/laravel-smtp2go/tree/v1.3.0"
+                "source": "https://github.com/motomedialab/laravel-smtp2go/tree/v1.4.0"
             },
-            "time": "2026-03-18T15:44:04+00:00"
+            "time": "2026-08-22T05:19:51+00:00"
         },
         {
             "name": "mtdowling/jmespath.php",
@@ -2922,16 +2922,16 @@
         },
         {
             "name": "nesbot/carbon",
-            "version": "3.13.2",
+            "version": "3.14.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/CarbonPHP/carbon.git",
-                "reference": "a1c54919f5fff9800cd03c32bd01defd5a4061cb"
+                "reference": "0023eaa2c9110e47446dd512a263c69c40cd41f2"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/CarbonPHP/carbon/zipball/a1c54919f5fff9800cd03c32bd01defd5a4061cb",
-                "reference": "a1c54919f5fff9800cd03c32bd01defd5a4061cb",
+                "url": "https://api.github.com/repos/CarbonPHP/carbon/zipball/0023eaa2c9110e47446dd512a263c69c40cd41f2",
+                "reference": "0023eaa2c9110e47446dd512a263c69c40cd41f2",
                 "shasum": ""
             },
             "require": {
@@ -3023,7 +3023,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-08-08T11:40:35+00:00"
+            "time": "2026-09-12T20:45:19+00:00"
         },
         {
             "name": "nette/schema",
