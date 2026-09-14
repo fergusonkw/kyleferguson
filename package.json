@@ -35,7 +35,7 @@
         "jszip": "^3.10.1",
         "pdfmake": "^0.3.11",
         "lucide": "^1.27.0",
-        "preline": "^4.2.0",
+        "preline": "^5.0.0",
         "prismjs": "^1.29.0",
         "simplebar": "^6.3.3",
         "sweetalert2": "^11.26.25"
