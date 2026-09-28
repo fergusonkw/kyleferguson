@@ -175,6 +175,9 @@
                                                 @endforeach
                                             </div>
                                         @endif
+                                        @foreach($line->usageNotes() as $usageNote)
+                                            <div class="text-xs text-default-500 mt-1">{{ $usageNote }}</div>
+                                        @endforeach
                                         @if($line->rateNote())
                                             <div class="text-xs text-default-500 mt-1">{{ $line->rateNote() }}</div>
                                         @endif

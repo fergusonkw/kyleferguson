@@ -310,10 +310,6 @@ final class BillingSync implements BillingSyncAdapter, CredentialValidator
 
     private function describe(CostProvider $provider, Smtp2goCycle $cycle): string
     {
-        $usage = $cycle->max > 0
-            ? sprintf(' (%s of %s emails)', number_format($cycle->used), number_format($cycle->max))
-            : sprintf(' (%s emails)', number_format($cycle->used));
-
-        return 'SMTP2GO — '.$provider->display_name.$usage;
+        return sprintf('SMTP2GO — %s (%s)', $provider->display_name, $cycle->usage()->summary());
     }
 }

@@ -85,4 +85,22 @@ final class CostLineItemFactory extends Factory
             'usd_tax' => $tax,
         ]);
     }
+
+    /**
+     * A cost from a service that reports what it consumed against an
+     * allowance, the way an SMTP2GO plan does.
+     */
+    public function reportingUsage(float $used, ?float $included = null, string $unit = 'emails'): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'metadata' => ($attributes['metadata'] ?? []) + [
+                'usage' => [
+                    'label' => '',
+                    'used' => $used,
+                    'included' => $included,
+                    'unit' => $unit,
+                ],
+            ],
+        ]);
+    }
 }

@@ -245,6 +245,9 @@
                 @endforeach
               </div>
             @endif
+            @foreach($line->usageNotes() as $usageNote)
+              <div class="item-sub">{{ $usageNote }}</div>
+            @endforeach
             @if($line->conversionNote())
               <div class="item-sub">{{ $line->conversionNote() }}</div>
             @endif

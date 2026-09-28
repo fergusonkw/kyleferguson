@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models\Billing;
 
 use App\Enums\Billing\InvoiceLineType;
+use App\Services\Billing\Dto\UsageSnapshot;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -131,6 +132,46 @@ final class InvoiceLine extends Model
         return $this->isMetered()
             ? sprintf('%s × $%s', $this->quantityLabel(), number_format((float) $this->unit_rate, 2))
             : null;
+    }
+
+    /**
+     * What the services on this line reported consuming, as frozen onto the
+     * invoice by {@see \App\Services\Billing\InvoiceUsageSnapshotter}.
+     *
+     * @return list<UsageSnapshot>
+     */
+    public function usageSnapshots(): array
+    {
+        $entries = $this->metadata['usage'] ?? null;
+
+        if (! is_array($entries)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(
+            static fn (mixed $entry): ?UsageSnapshot => is_array($entry) ? UsageSnapshot::fromArray($entry) : null,
+            $entries,
+        )));
+    }
+
+    /**
+     * Usage as a client reads it under the line — "7,608 of 50,000 emails".
+     *
+     * The service is named only where the line does not already name it, which
+     * it does whenever a project draws on a single provider.
+     *
+     * @return list<string>
+     */
+    public function usageNotes(): array
+    {
+        $snapshots = $this->usageSnapshots();
+        $single = count($snapshots) === 1;
+
+        return array_map(function (UsageSnapshot $usage) use ($single): string {
+            return $single && $usage->label !== '' && str_contains($this->label, $usage->label)
+                ? $usage->summary()
+                : trim($usage->label.': '.$usage->summary(), ': ');
+        }, $snapshots);
     }
 
     /**
