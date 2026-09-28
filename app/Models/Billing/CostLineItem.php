@@ -6,6 +6,7 @@ namespace App\Models\Billing;
 
 use App\Enums\Billing\CostAttributionState;
 use App\Enums\Billing\CostCategory;
+use App\Services\Billing\Dto\UsageSnapshot;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -146,6 +147,27 @@ final class CostLineItem extends Model
         return $this->project_id === null
             ? null
             : "cost_line_items:period={$this->period};project={$this->project_id}";
+    }
+
+    /**
+     * What the provider reported consuming for this cost, where it reports
+     * usage at all. A flat monthly fee for an allowance — SMTP2GO's plan, say —
+     * is only meaningful to a client alongside what the allowance was.
+     */
+    public function usage(): ?UsageSnapshot
+    {
+        $usage = $this->metadata['usage'] ?? null;
+
+        if (! is_array($usage)) {
+            return null;
+        }
+
+        // The sync reports figures; what the service is *called* on an invoice
+        // is the operator's to change, so it is taken live rather than from
+        // whatever the label was when the usage was recorded.
+        $usage['label'] = $this->costProvider->invoiceLabel();
+
+        return UsageSnapshot::fromArray($usage);
     }
 
     public function attributionState(): CostAttributionState

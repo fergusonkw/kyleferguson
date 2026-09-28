@@ -25,6 +25,7 @@ final class InvoiceApprover
     public function __construct(
         private readonly AuditLogger $audit,
         private readonly InvoiceSnapshotter $snapshots,
+        private readonly InvoiceUsageSnapshotter $usage,
         private readonly SmallSupplierThreshold $threshold,
         private readonly InvoicePdfRenderer $documents,
     ) {}
@@ -60,6 +61,12 @@ final class InvoiceApprover
             // business between the two would otherwise issue an invoice
             // carrying details the operator had already corrected.
             $this->snapshots->capture($invoice);
+
+            // Metered usage is frozen for the same reason and at the same
+            // moment: a service's figures keep moving after the period closes,
+            // and what the invoice claims the client used must not move with
+            // them once the invoice has been issued.
+            $this->usage->capture($invoice);
 
             // A due date set by hand on the draft is a deliberate choice —
             // "due on receipt", a date negotiated for this one invoice — so

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Billing\Smtp2go\Dto;
 
+use App\Services\Billing\Dto\UsageSnapshot;
 use Illuminate\Support\Carbon;
 use InvalidArgumentException;
 
@@ -85,6 +86,22 @@ final readonly class Smtp2goCycle
     }
 
     /**
+     * The plan allowance and what has been drawn against it, in the shape any
+     * provider reporting usage writes — so an invoice can show the figures
+     * without knowing SMTP2GO exists. A plan with no stated ceiling reports
+     * consumption alone.
+     */
+    public function usage(): UsageSnapshot
+    {
+        return new UsageSnapshot(
+            label: '',
+            used: (float) $this->used,
+            included: $this->max > 0 ? (float) $this->max : null,
+            unit: 'emails',
+        );
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function toMetadata(): array
@@ -95,6 +112,7 @@ final readonly class Smtp2goCycle
             'cycle_used' => $this->used,
             'cycle_remaining' => $this->remaining,
             'cycle_max' => $this->max,
+            'usage' => $this->usage()->toArray(),
         ];
     }
 

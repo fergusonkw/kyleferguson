@@ -38,6 +38,7 @@ final class InvoiceBuilder
         private readonly FxRateService $fxRates,
         private readonly InvoiceNumberAllocator $numbers,
         private readonly InvoiceSnapshotter $snapshots,
+        private readonly InvoiceUsageSnapshotter $usage,
     ) {}
 
     /**
@@ -100,6 +101,10 @@ final class InvoiceBuilder
             $order = $this->addHostingLines($invoice, $client, $period, $rate, $order);
             $order = $this->addRecurringLines($invoice, $client, $currency, $period, $periodStart, $periodEnd, $order);
             $this->addCarriedCredits($invoice, $client, $period, $order);
+
+            // What the services reported consuming, so a draft shows it under
+            // review. Approval takes the copy that is kept.
+            $this->usage->capture($invoice);
 
             $this->recalculateTotals($invoice);
 

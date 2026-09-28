@@ -90,6 +90,7 @@ Rules:
 - Provider-derived numbers are **not editable**. Corrections happen via separate adjustment lines so the audit trail is preserved.
 - Sub-items are display-only; markup applies to the parent total, not per sub-item.
 - Any line may carry a free-text **description**, rendered under its title. A four-figure line needs to explain itself before a client can approve it for payment.
+- **A service that reports usage against an allowance shows it under its line** — "7,608 of 50,000 emails" beneath an SMTP2GO charge. The fee buys the allowance rather than the consumption, so the figures never move the amount; they are what makes a flat charge checkable. The usage is **snapshotted onto the line when the draft is built and again at approval**, for the same reason the FX rate and business details are: a cycle straddling two months keeps counting after the month it describes has closed, and an issued invoice must not restate what it told the client they used.
 - **A line may be priced in a currency the client is not billed in** — a domain renewal bought in USD on a CAD invoice. Recurring templates and manual lines both convert at the invoice period's rate, and the line keeps the original amount, its currency, and the rate applied, so the document shows its working ("USD 18.00 at 1.375") rather than asserting a converted figure. A rate that cannot be resolved refuses the line rather than guessing.
 - The invoice carries: client, billing period, FX rate used, line items, subtotal, total, status, timestamps.
 
